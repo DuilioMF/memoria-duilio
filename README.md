@@ -1,5 +1,7 @@
 # Memoria Duilio
 
+[![Abrir Memoria Duilio](https://img.shields.io/badge/▶%20ABRIR-Memoria%20Duilio-ff6b35?style=for-the-badge)](https://memoria-duilio.revalsoftia.chatgpt.site)
+
 Centro de control conversacional y orquestador de proyectos de Duilio.
 
 ## Estado verificable
