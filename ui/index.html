@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#111111" />
+  <title>Memoria Duilio</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <div class="brand-row"><span class="brain">◉</span><strong>Memoria Duilio</strong><span class="private">Privada</span></div>
+        <div class="subtle">0.1.0-recovery.1 · reconstrucción versionada</div>
+      </div>
+      <button id="refreshBtn" class="ghost">Actualizar</button>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="talk">Hablar</button>
+      <button class="tab" data-tab="projects">Proyectos</button>
+      <button class="tab" data-tab="today">Hoy</button>
+    </nav>
+
+    <section id="authPanel" class="card hidden">
+      <h2>Sesión requerida</h2>
+      <p>Esta copia de recuperación no guarda claves privadas. Iniciá sesión con Supabase o usá una sesión inyectada por el entorno.</p>
+      <form id="loginForm">
+        <input id="email" type="email" autocomplete="username" placeholder="Email" />
+        <input id="password" type="password" autocomplete="current-password" placeholder="Contraseña" />
+        <button type="submit">Entrar</button>
+      </form>
+      <p id="authMessage" class="subtle"></p>
+    </section>
+
+    <section id="talk" class="panel active">
+      <div class="talk-card">
+        <button id="micBtn" class="mic" aria-label="Tocá para hablar">🎙</button>
+        <h1>Tocá para hablar</h1>
+        <div class="assistant-line"><span class="avatar">D</span><strong>Memoria Duilio</strong></div>
+        <label class="switch-row"><input id="speakToggle" type="checkbox" checked /> Escuchar respuesta</label>
+        <p class="prompt">Decime qué querés recordar, decidir o construir.</p>
+        <div id="conversation" class="conversation"></div>
+        <form id="messageForm" class="composer">
+          <input id="messageInput" autocomplete="off" placeholder="Mensaje" />
+          <button type="submit">Enviar</button>
+        </form>
+        <p class="subtle center">Primero recupera tus recuerdos relevantes · después responde</p>
+      </div>
+    </section>
+
+    <section id="projects" class="panel">
+      <div class="section-head">
+        <div><h2>Proyectos</h2><p class="subtle">Estado real desde Supabase.</p></div>
+      </div>
+      <div id="runningBlock"></div>
+      <div id="projectsGrid" class="grid"></div>
+      <details id="closedWorks" class="closed hidden">
+        <summary>Ver trabajos cerrados (<span id="closedCount">0</span>)</summary>
+        <div id="closedList"></div>
+      </details>
+    </section>
+
+    <section id="today" class="panel">
+      <h2>Hoy</h2>
+      <div id="counts" class="counts"></div>
+      <div class="split">
+        <div>
+          <h3>Prioridades</h3>
+          <div id="priorityList"></div>
+        </div>
+        <div>
+          <h3>Espera de vos</h3>
+          <div id="waitingList"></div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <span id="statusText">Sin sincronizar</span>
+    </footer>
+  </main>
+  <script src="./config.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
