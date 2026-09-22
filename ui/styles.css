@@ -21,3 +21,9 @@ button,input{font:inherit}.shell{max-width:1180px;margin:auto;padding:20px}.topb
 a{color:#ff9b75}.closed{margin-top:14px;background:#121214;border:1px solid var(--line);border-radius:14px;padding:12px}.hidden{display:none!important}
 #loginForm{display:flex;gap:8px;flex-wrap:wrap}footer{padding:16px 2px;color:#777;font-size:12px}
 @media(max-width:720px){.shell{padding:12px}.split{grid-template-columns:1fr}.topbar{align-items:flex-start}.composer{flex-direction:column}.talk-card{margin:6px 0}.brand-row{font-size:19px}}
+
+.project-title{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.project-title h3{margin:0 0 8px}
+.control-grid{grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+.control-project .meta{grid-template-columns:120px 1fr}
+@media(max-width:520px){.control-grid{grid-template-columns:1fr}.control-project .meta{grid-template-columns:105px 1fr}}
