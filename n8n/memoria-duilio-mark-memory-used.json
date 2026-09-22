@@ -1,0 +1,65 @@
+{
+  "id": "r8EHoms5bF1zJSdL",
+  "name": "Memoria Duilio — Marcar memoria usada",
+  "active": false,
+  "nodes": [
+    {
+      "id": "745cfff0-e7e4-41f8-9528-9c80508bb76d",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "3a99bc63-23e2-498c-a146-fc60a6919b63",
+      "name": "Mark used memory items",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://pddsehshgfynpmibjqhj.supabase.co/rest/v1/rpc/fn_mark_memory_used",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_memory_item_ids: Array.isArray($json.memory_item_ids) ? $json.memory_item_ids : [], p_owner_key: 'duilio', p_actor: $json.actor || 'n8n', p_action: $json.usage_action || 'used_in_response', p_project_id: $json.project_id || null }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "1c97DeFYwsVkadFQ",
+          "name": "Supabase account dmfpersonal@gmail.com - n8n"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Mark used memory items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "d166b5b2-313e-4012-8cb2-27b75820a8f8",
+  "exported_at": "2026-09-22T12:00:00Z",
+  "note": "Export real verificado contra n8n. Contiene referencias de credenciales, no secretos."
+}
