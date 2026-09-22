@@ -1,5 +1,5 @@
 const cfg = window.MEMORIA_CONFIG || {};
-const state = { home: null, token: cfg.accessToken || sessionStorage.getItem("memoria_access_token") || "" };
+const state = { home: null, control: null, token: cfg.accessToken || sessionStorage.getItem("memoria_access_token") || "" };
 
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
@@ -67,6 +67,48 @@ function runCard(r){
   <div class="meta"><span>Ejecutor</span><span>${esc(r.executor || "—")}</span><span>Estado</span><span>${esc(r.state || r.observed_state || "—")}</span>
   <span>Acción</span><span>${esc(r.last_action || "—")}</span><span>Heartbeat</span><span>${esc(fmt(r.heartbeat_at))}</span></div></div>`;
 }
+function controlProjectCard(p){
+  const stateClass = ["running","blocked","stale_run","source_missing","source_stale"].includes(String(p.operational_state||"")) ? "live" : "";
+  return `<article class="project control-project">
+    <div class="project-title"><h3>${esc(p.project_name)}</h3><span class="badge ${stateClass}">${esc(p.operational_state || "idle")}</span></div>
+    <div class="meta">
+      <span>Proyecto padre</span><span>${esc(p.parent_project_name || "—")}</span>
+      <span>Versión</span><span>${esc(p.current_version || "—")}</span>
+      <span>Autoridad</span><span>${esc(p.version_authority || "—")}</span>
+      <span>Fuentes</span><span>${esc(`${p.sources_fresh||0} frescas · ${p.sources_stale||0} stale · ${p.sources_missing||0} faltantes`)}</span>
+      <span>Queue</span><span>${esc(p.queue_state || "—")}</span>
+      <span>Ejecutor</span><span>${esc(p.executor_key || p.run_executor || "—")}</span>
+      <span>Heartbeat</span><span>${esc(fmt(p.heartbeat_at))}</span>
+      <span>Última acción</span><span>${esc(p.last_action || "—")}</span>
+      <span>Memorias</span><span>${esc(`${p.verified_memories||0} verificadas · ${p.recorded_memories||0} registradas`)}</span>
+      <span>Aprendizaje</span><span>${esc(`${p.pending_experiences||0} exp. pendientes · ${p.candidate_knowledge||0} candidatos · ${p.active_knowledge||0} activos`)}</span>
+    </div>
+  </article>`;
+}
+function renderControl(control){
+  state.control = control;
+  const totals = control?.totals || {};
+  $("controlCounts").innerHTML =
+    countCard("Proyectos",totals.projects)+
+    countCard("Ejecutando",totals.running)+
+    countCard("En cola",totals.queued)+
+    countCard("Bloqueados",totals.blocked)+
+    countCard("Stale",totals.stale_runs)+
+    countCard("Problemas fuente",totals.source_issues)+
+    countCard("Experiencias pendientes",totals.pending_experiences)+
+    countCard("Conocimiento activo",totals.active_knowledge);
+  $("controlGrid").innerHTML = (control?.projects || []).map(controlProjectCard).join("");
+  const daily = control?.last_daily_run;
+  $("dailyRun").innerHTML = daily
+    ? `<div class="run"><strong>Rutina 08:00 · ${esc(daily.status || "—")}</strong><div class="meta">
+        <span>Run</span><span>${esc(daily.run_key || "—")}</span>
+        <span>Paso</span><span>${esc(daily.step || "—")}</span>
+        <span>Inicio</span><span>${esc(fmt(daily.started_at))}</span>
+        <span>Fin</span><span>${esc(fmt(daily.finished_at))}</span>
+        <span>Resumen</span><span>${esc(daily.summary || "—")}</span>
+      </div></div>`
+    : "<p class='subtle'>Sin corrida diaria registrada.</p>";
+}
 function renderHome(home){
   state.home = home;
   const t = home.today || {};
@@ -98,6 +140,12 @@ async function refreshHome(){
   try{
     const home = await api({action:"home"});
     renderHome(home);
+    try {
+      const control = await api({action:"control_center"});
+      renderControl(control);
+    } catch (controlError) {
+      $("controlGrid").innerHTML = `<p class="subtle">Centro de control no disponible: ${esc(controlError.message)}</p>`;
+    }
     showAuth(false);
   }catch(e){
     setStatus(e.message);
