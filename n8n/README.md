@@ -2,40 +2,44 @@
 
 ## Estado actual
 
-Existe un workflow n8n real y persistido para registrar el uso efectivo de memorias:
+La integración de uso real de memoria está conectada a un workflow productivo.
 
-- workflow: `Memoria Duilio — Marcar memoria usada`;
-- workflow id: `r8EHoms5bF1zJSdL`;
-- estado al exportar: **inactive**;
-- archivo: `n8n/memoria-duilio-mark-memory-used.json`;
-- entrada esperada: `memory_item_ids` como array UUID, con `actor`, `usage_action` y `project_id` opcionales;
-- destino: RPC `public.fn_mark_memory_used`;
-- autenticación: referencia a credencial Supabase existente en n8n, sin secretos versionados.
+### Workflow productivo
 
-El workflow usa `Execute Sub-workflow Trigger`. Un workflow que recupere Memoria Duilio debe llamarlo después de saber cuáles `memory_item_ids` se usaron realmente para construir la respuesta.
+- `Whatsapp escuchando a la Duilio`
+- ID: `2QazWFxhUkURI15A`
+- estado: **active**
+- export: `n8n/whatsapp-duilio-memory-integrated.json`
+- rollback: `n8n/backups/whatsapp-duilio-before-memory-20260922-1028.json`
 
-## Inventario vivo — 22/09/2026
+Ruta:
 
-Se inspeccionaron los workflows reales de n8n por API. En ese momento:
+`Switch2 → Buscar Memoria Duilio → Preparar contexto Memoria Duilio → AI Agent Agenda → Extraer memorias usadas → Send message + Marcar memorias usadas`
 
-- no había workflows que llamaran directamente a `memory_resume_project`;
-- no había workflows que consultaran `memory_items`, `memory_knowledge` o `memory_experiences` de Memoria Duilio;
-- sí había nodos `Postgres Chat Memory`, pero pertenecen a la memoria conversacional propia de n8n y no deben contabilizarse como uso de `memory_items`.
+La búsqueda recupera candidatos desde `memoria-duilio-semantic`. El agente recibe cada fragmento con su `MEMORY_ID`, pero sólo los IDs que realmente influyeron en la respuesta se envían al circuito de feedback. Antes de WhatsApp, el marcador técnico se elimina.
 
-Por esta razón no se modificó ningún workflow productivo ajeno: hacerlo habría generado métricas falsas.
+### Subworkflow de marcado
 
-## Integración correcta
+- `Memoria Duilio — Marcar memoria usada`
+- ID: `r8EHoms5bF1zJSdL`
+- estado: **active**
+- export: `n8n/memoria-duilio-mark-memory-used.json`
+- trigger: passthrough
+- destino: RPC `public.fn_mark_memory_used`
 
-Cuando un workflow empiece a consumir Memoria Duilio:
+La función deduplica IDs, restringe por owner/proyecto y registra únicamente items efectivamente actualizados.
 
-1. recuperar candidatos mediante el API semántico o las tablas de Memoria Duilio;
-2. identificar los `memory_item_id` realmente usados;
-3. pasar sólo esos IDs al subworkflow `Memoria Duilio — Marcar memoria usada`;
-4. verificar la respuesta del RPC;
-5. no marcar todos los candidatos de búsqueda como usados.
+## Verificación
 
-El API semántico también dispone de la acción `mark_used` para integraciones que trabajen a través de la Edge Function.
+Prueba neutra con `memory_item_ids=[]`:
+
+- ejecución padre `9171`: success;
+- ejecución hija `9172`: success;
+- nodo `Mark used memory items`: success;
+- eventos de prueba creados: 0.
+
+Evidencia detallada: `n8n/verification/20260922-memory-usage-integration.md`.
 
 ## Seguridad
 
-Nunca versionar credenciales, tokens, contraseñas, headers privados ni service role. El export conserva únicamente referencias de credenciales de n8n.
+Nunca versionar secretos, tokens, contraseñas, headers privados ni service role. Los exports conservan referencias de credenciales de n8n, no sus valores.
