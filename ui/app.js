@@ -22,9 +22,11 @@ async function api(body){
   if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
   return data.data ?? data.result ?? data;
 }
-async function semantic(query){
+async function semantic(query,projectKey=null){
   if (!cfg.semanticUrl) return null;
-  const r = await fetch(cfg.semanticUrl,{method:"POST",headers:authHeaders(),body:JSON.stringify({action:"search",query,limit:5})});
+  const body = {action:"search",query,limit:5};
+  if (projectKey) body.project_key = projectKey;
+  const r = await fetch(cfg.semanticUrl,{method:"POST",headers:authHeaders(),body:JSON.stringify(body)});
   if (!r.ok) return null;
   return await r.json().catch(()=>null);
 }
@@ -65,7 +67,7 @@ function projectCard(p){
 function runCard(r){
   return `<div class="run"><strong>${esc(r.project_name || r.project_key || "Ejecución")}</strong>
   <div class="meta"><span>Ejecutor</span><span>${esc(r.executor || "—")}</span><span>Estado</span><span>${esc(r.state || r.observed_state || "—")}</span>
-  <span>Acción</span><span>${esc(r.last_action || "—")}</span><span>Heartbeat</span><span>${esc(fmt(r.heartbeat_at))}</span></div></div>`;
+  <span>Acción</span><span>${esc(r.last_action || "—")}</span><span>Última señal</span><span>${esc(fmt(r.last_activity_at || r.heartbeat_at))}</span></div></div>`;
 }
 function renderHome(home){
   state.home = home;
@@ -75,15 +77,13 @@ function renderHome(home){
     countCard("Por hacer",c.por_hacer)+countCard("En prueba",c.en_prueba)+countCard("En ejecución",c.en_ejecucion)+countCard("Espera de vos",c.espera_de_vos)+countCard("Ejecuciones reales",c.ejecuciones_reales);
 
   $("priorityList").innerHTML = (t.priority_items || []).map(x => `<article class="priority"><h4>${esc(x.title)}</h4><span class="badge">${esc(x.state)}</span> ${x.card_url?`<a href="${esc(x.card_url)}" target="_blank" rel="noreferrer">Trello</a>`:""}</article>`).join("") || "<p class='subtle'>Sin prioridades.</p>";
-  $("waitingList").innerHTML = (home.waiting_for_you || []).map(x => `<article class="waiting">${esc(x.title || x.project_name || JSON.stringify(x))}</article>`).join("") || "<p class='subtle'>Nada espera de vos ahora.</p>";
+  $("waitingList").innerHTML = (home.waiting_for_you || []).map(x => `<article class="waiting"><strong>${esc(x.title || x.project_name || "Pendiente")}</strong><div class="meta"><span>Estado</span><span>${esc(x.state || "Espera de vos")}</span><span>Ejecutor</span><span>${esc(x.executor || "—")}</span><span>Última acción</span><span>${esc(x.last_action || "—")}</span></div></article>`).join("") || "<p class='subtle'>Nada espera de vos ahora.</p>";
 
   const projects = home.projects || [];
   $("projectsGrid").innerHTML = projects.map(projectCard).join("");
   const running = home.running || [];
-  $("runningBlock").innerHTML = running.length ? `<h3>Ejecutándose</h3>${running.map(runCard).join("")}` : "<p class='subtle'>No hay ejecuciones reales activas.</p>";
+  $("runningBlock").innerHTML = running.length ? running.map(runCard).join("") : "<p class='subtle'>No hay ejecuciones reales activas.</p>";
 
-  // La API home solo expone ejecuciones activas. Los cerrados se mantienen plegados
-  // si el hosting agrega closed_runs en una versión posterior.
   const closed = home.closed_runs || [];
   $("closedCount").textContent = closed.length;
   $("closedList").innerHTML = closed.map(runCard).join("");
@@ -123,19 +123,45 @@ async function handleMessage(raw){
     const answer="Hola Duilio, acá estoy. ¿En qué seguimos?";
     addBubble(answer); speak(answer); return;
   }
-  addBubble("Recuperando contexto…");
+
+  addBubble("Ubicando proyecto…");
   const pending = $("conversation").lastElementChild;
+
   try{
-    const [plan,mem] = await Promise.all([api({action:"plan",request:text}),semantic(text)]);
+    const plan = await api({action:"plan",request:text});
+    const brain = plan?.brain_router || {};
+    const needsClarification = plan?.clarification_required === true || brain?.clarification_required === true;
+
+    if (needsClarification){
+      pending.remove();
+      const answer = plan?.clarification_question || brain?.clarification_question || "¿De qué proyecto hablás?";
+      addBubble(answer); speak(answer); return;
+    }
+
+    const projectKey = plan?.project_key || brain?.project?.project_key || null;
+    const projectName = brain?.project?.project_name || projectKey || "";
+    pending.textContent = projectName ? `Recuperando contexto de ${projectName}…` : "Recuperando contexto…";
+
+    const mem = await semantic(text,projectKey);
     pending.remove();
+
     const learned = mem?.results || [];
     const snippets = learned.slice(0,3).map(x=>x.title || x.content || x.chunk_content).filter(Boolean);
-    let answer = "Plan de Memoria: ";
-    const route = plan?.source?.name || plan?.source_name || plan?.source || plan?.executor?.display_name || plan?.executor || "";
-    answer += route ? `consultar ${typeof route==="string"?route:"las fuentes vigentes"}.` : "usar las fuentes vigentes.";
+    const sourceName = plan?.source_plan?.primary_source?.name || plan?.source_plan?.primary_source?.system_key || "";
+    const executor = plan?.executor_plan?.executor?.display_name || plan?.executor_plan?.executor?.name || plan?.executor_plan?.executor_key || "";
+
+    let answer = "";
+    if (projectName) answer += `Proyecto: ${projectName}.`;
+    if (sourceName) answer += `${answer?" ":""}Fuente: ${sourceName}.`;
+    if (executor) answer += `${answer?" ":""}Ejecutor sugerido: ${executor}.`;
+    if (!answer) answer = "Contexto localizado.";
     if (snippets.length) answer += "\n\nRecuerdos relevantes:\n• "+snippets.join("\n• ");
+
     addBubble(answer); speak(answer);
-  }catch(e){ pending.remove(); addBubble(e.message,"error"); }
+  }catch(e){
+    pending.remove();
+    addBubble(e.message,"error");
+  }
 }
 
 document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
