@@ -1,0 +1,433 @@
+{
+  "id": "2QazWFxhUkURI15A",
+  "name": "Whatsapp escuchando a la Duilio",
+  "active": true,
+  "updatedAt": "2026-09-08T10:43:13.734Z",
+  "versionId": "4822c173-edef-4d63-a092-73a753583d2f",
+  "activeVersionId": "4822c173-edef-4d63-a092-73a753583d2f",
+  "versionCounter": 86,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "29f66d4d-7c89-42ad-b856-8a01686d5425",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1408,
+        -32
+      ],
+      "id": "6c45666f-1887-4665-a17f-e4ee98258256",
+      "name": "Webhook",
+      "webhookId": "29f66d4d-7c89-42ad-b856-8a01686d5425"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -768,
+        48
+      ],
+      "id": "19373c69-3d51-4292-adc1-52f85f349f2e",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "PnLtSGK4nr7r1cun",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "dmfpersonal@gmail.com",
+          "mode": "list",
+          "cachedResultName": "dmfpersonal@gmail.com"
+        },
+        "returnAll": true,
+        "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('After', ``, 'string') }}",
+        "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Before', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        192,
+        432
+      ],
+      "id": "47b23225-1266-4966-ba70-396ad926f54e",
+      "name": "Get many events in Google Calendar",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "7Y6yKD5oMFBGNulv",
+          "name": "Google Calendar account - dmfpersonal@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "dmfpersonal@gmail.com",
+          "mode": "list",
+          "cachedResultName": "dmfpersonal@gmail.com"
+        },
+        "start": "={{ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ $fromAI('End', ``, 'string') }}",
+        "additionalFields": {
+          "attendees": [],
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', ``, 'string') }}",
+          "sendUpdates": "all",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        -464,
+        368
+      ],
+      "id": "de23f9ae-27f9-4a32-9df2-ea46c0c0f579",
+      "name": "Create an event in Google Calendar",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "7Y6yKD5oMFBGNulv",
+          "name": "Google Calendar account - dmfpersonal@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "dmfpersonal@gmail.com",
+          "mode": "list",
+          "cachedResultName": "dmfpersonal@gmail.com"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        -64,
+        416
+      ],
+      "id": "3718450c-4df0-47cf-9ac4-be18f174e015",
+      "name": "Delete an event in Google Calendar",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "7Y6yKD5oMFBGNulv",
+          "name": "Google Calendar account - dmfpersonal@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "dmfpersonal@gmail.com",
+          "mode": "list",
+          "cachedResultName": "dmfpersonal@gmail.com"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "updateFields": {
+          "sendUpdates": "all"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        -256,
+        304
+      ],
+      "id": "2099f5d9-dfe2-4e4d-9c11-882df0694363",
+      "name": "Update an event in Google Calendar",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "7Y6yKD5oMFBGNulv",
+          "name": "Google Calendar account - dmfpersonal@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $('Switch2').item.json.body.phone_number_id}}",
+        "recipientPhoneNumber": "={{ $('Switch2').item.json.body.wa_id}}",
+        "textBody": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        -48
+      ],
+      "id": "a02079d1-a14e-40cc-bc1b-8a5843d4d40e",
+      "name": "Send message",
+      "webhookId": "a8472e65-57a7-4707-ac49-a3178d789394",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "fnH8LCejY6DK3Qew",
+          "name": "WhatsApp account 200"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Switch2').item.json.body.wa_id}}",
+        "tableName": "n8nchat_histories_duilio_fracchia",
+        "contextWindowLength": 1
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        -592,
+        144
+      ],
+      "id": "0caf995c-883d-4653-9461-2908afd82603",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "RZjVR2tZ8UiA7qOO",
+          "name": "Postgres account - supabase - GyM - duiliofracchia@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.mensaje_limpio }}",
+        "options": {
+          "systemMessage": "=Tu nombre es DoingLio.\n\n---\n\n🕐 REGLA DE ZONA HORARIA (OBLIGATORIA)\n\nUsar SIEMPRE:\n\nfecha = {{ $now.setZone(\"America/Argentina/Buenos_Aires\").toFormat(\"dd/MM/yyyy\") }}\nhora  = {{ $now.setZone(\"America/Argentina/Buenos_Aires\").toFormat(\"HH:mm\") }}\n\nAl crear o modificar eventos:\n\n* Siempre incluir timeZone = \"America/Argentina/Buenos_Aires\"\n* Nunca enviar dateTime sin zona horaria\n* Nunca asumir UTC\n\n---\n\n⚠️ REGLA CRÍTICA SOBRE FECHA Y HORA\n\n* Nunca busques la fecha ni la hora en memoria, contexto previo ni conocimiento interno\n* Siempre usar exclusivamente las funciones indicadas arriba\n* No utilizar ningún otro método para calcular fechas\n\n---\n\n👋 SALUDO\n\nCuando el usuario diga: Hola, buen día, buenas\n\nResponder:\n\nHola, Duilio Crack soy DoingLio\n¿En qué puedo ayudarte hoy con tu agenda o calendario?\n\nSi querés agendar un evento, necesitás indicarme:\n\n• Fecha\n• Hora de inicio\n• Hora de fin\n• Título\n• Descripción (opcional)\n\nTambién podés decirme algo como:\n\"Agendá una reunión mañana de 10 a 11 con Duilio\"\n\n---\n\n🎯 OBJETIVO PRINCIPAL\n\nGestionar eventos de Google Calendar usando EXCLUSIVAMENTE las herramientas disponibles en n8n.\n\n---\n\n🛑 REGLA ABSOLUTA SOBRE GOOGLE CALENDAR\n\nCuando el usuario:\n\n* Pregunte por su agenda\n* Consulte eventos\n* Diga “¿qué tengo…?”\n* Diga “ver”, “listar”, “mostrar”, “agenda”, “reuniones”, “citas” , \"agendar\"\n* Pida modificar, borrar o mover eventos\n\nDEBES:\n\n* Llamar a la herramienta correspondiente de Google Calendar\n* Nunca responder sin ejecutar la herramienta (si tienes los datos necesarios)\n* Nunca inventar eventos\n* Nunca usar conocimiento interno\n\n---\n\n📅 ACCIONES DISPIBLES (TOOLS)\n\n* Consultar eventos → Get many events in Google Calendar\n* Crear evento → Create an event in Google Calendar\n* Modificar evento → Update an event in Google Calendar\n\nEliminar evento:\n\n1. Buscar evento → Get many events in Google Calendar\n2. Obtener ID\n3. Eliminar → Delete an event in Google Calendar\n\n---\n\n📌 INTERPRETACIÓN DEL MENSAJE\n\nAntes de ejecutar cualquier acción:\n\n1. Detectar intención\n2. Extraer:\n\n   * Fecha\n   * Hora inicio\n   * Hora fin\n   * Título\n   * Descripción (opcional)\n\n---\n\n📌 REGLA DE DATOS INCOMPLETOS\n\nSi falta algún dato obligatorio:\n\n* NO ejecutar ninguna herramienta\n* Preguntar SOLO por el dato faltante\n* Ser claro y directo\n\n---\n\n📌 INTERPRETACIÓN DE FECHAS\n\nConvertir SIEMPRE a formato dd/MM/yyyy:\n\n* hoy → fecha actual\n* mañana → fecha actual +1\n* pasado mañana → fecha actual +2\n\nNunca usar texto relativo en herramientas.\n\n---\n\n📌 CONSULTA DE EVENTOS\n\nCuando consultes eventos por fecha:\n\n* Buscar en TODO el día:\n\n  * Desde 00:00 hasta 23:59\n* No asumir un solo evento\n* Si hay varios → listar TODOS\n\nFormato de respuesta:\n\n📅 Eventos para el día DD/MM/YYYY:\n\n1️⃣ HH:MM a HH:MM – Título\n2️⃣ HH:MM a HH:MM – Título\n\n---\n\n📌 CREACIÓN / MODIFICACIÓN / ELIMINACIÓN\n\nAl ejecutar una acción:\n\n* Confirmar claramente lo realizado\n* Mostrar:\n\n  * Fecha\n  * Hora inicio\n  * Hora fin\n  * Título\n\n---\n\n📌 CONFIRMACIONES\n\nPedir confirmación SOLO cuando:\n\n* La fecha u hora sean ambiguas\n* Haya múltiples eventos posibles\n* Se vaya a eliminar un evento\n\n---\n\n📌 REGLAS GENERALES\n\n* Nunca inventar fechas ni horarios\n* Si el usuario dice “agendá algo” → pedir fecha\n* Si dice “mañana a la tarde” → pedir hora exacta\n* Si hay eventos similares → pedir aclaración\n* Nunca eliminar sin confirmación explícita\n* Usar siempre el calendario principal\n\n---\n\n🗣️ ESTILO DE RESPUESTA\n\n* Español claro y profesional\n* Respuestas cortas\n* Sin explicar razonamiento interno\n* Primero ejecutar, luego responder\n* Informar siempre el resultado\n\n---\n\n🧠 CONTEXTO\n\nUsar contexto SOLO para:\n\n* Continuar acciones en curso\n* Confirmaciones pendientes\n* Identificación de eventos ya listados\n\n---\n\n🚨 MANEJO DE ERRORES (OBLIGATORIO)\n\nSi ocurre cualquier error al usar Google Calendar:\n\nResponder EXACTAMENTE:\n\n\"No se pudo acceder a la Agenda, contactese con su Administrador\"\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        -384,
+        -256
+      ],
+      "id": "ff141fe9-0552-445f-8da3-8287d26535a4",
+      "name": "AI Agent Agenda"
+    },
+    {
+      "parameters": {
+        "functionCode": "const msg = (\n  $json.body?.mensaje_audio ||\n  $json.body?.mensaje ||\n  $json.mensaje ||\n  \"\"\n).trim();\n\n// limpiar saludo\nconst limpio = msg\n  .replace(/^\\s*(hola|buen dia|buen día|buenas|buenas tardes|buenas noches)[\\s,!.\\-]*/i, '')\n  .trim();\n\nreturn [{\n  json: {\n    ...$json,\n    mensaje_original: msg,\n    mensaje_limpio: limpio\n  }\n}];"
+      },
+      "id": "ed91cb72-1198-4dd6-a0c0-7f1f67722c1a",
+      "name": "Parse3",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -1152,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.wa_id }}",
+                    "rightValue": "5493413692112",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "46e98878-c822-4970-a792-e34da5e68e80"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Duilio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "7f4cc828-0350-4703-aa64-9b5b0cee1ccb",
+                    "leftValue": "=",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "No es Duilio"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -800,
+        -240
+      ],
+      "id": "afed683f-e03c-4ac9-bd04-8128f228bd0b",
+      "name": "Switch2"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent Agenda",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events in Google Calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Agenda",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event in Google Calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Agenda",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete an event in Google Calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Agenda",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update an event in Google Calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Agenda",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent Agenda",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent Agenda": {
+      "main": [
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse3": {
+      "main": [
+        [
+          {
+            "node": "Switch2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch2": {
+      "main": [
+        [
+          {
+            "node": "AI Agent Agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "backup_reason": "Antes de integrar Memoria Duilio semantic search + actual-use tracking",
+  "backed_up_at": "2026-09-22T10:28:00-03:00"
+}
