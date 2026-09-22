@@ -28,6 +28,11 @@ Deno.serve(async (req: Request) => {
       if (error) throw error;
       return reply({ok:true,action,data});
     }
+    if (action === "control_center") {
+      const {data,error} = await supabase.rpc("memory_control_center_summary");
+      if (error) throw error;
+      return reply({ok:true,action,data});
+    }
     if (action === "plan") {
       const request = String(body?.request ?? "").trim();
       if (!request) return reply({ok:false,error:"REQUEST_REQUIRED"},400);
