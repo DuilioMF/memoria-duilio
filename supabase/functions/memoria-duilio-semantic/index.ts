@@ -226,7 +226,7 @@ Deno.serve(async (req) => {
     ).toLowerCase();
 
     if (action === "health") {
-      return json({ status: "ok", version: 10, phase: 6 });
+      return json({ status: "ok", version: 11, phase: 6 });
     }
 
     if (action === "sync" || action === "learning_sync") {
@@ -255,6 +255,45 @@ Deno.serve(async (req) => {
       return json({action, result: result.data});
     }
 
+
+    if (action === "mark_used") {
+      if (!(await authorized(req, "search"))) return json({ error: "unauthorized" }, 401);
+      const rawIds = Array.isArray(body.memory_item_ids) ? body.memory_item_ids : [];
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const ids = [...new Set(rawIds.map((id: unknown) => String(id ?? "").trim()).filter((id: string) => uuidPattern.test(id)))];
+      if (!ids.length) return json({ action, marked_count: 0, marked: [] });
+
+      let projectId: string | null = body.project_id ? String(body.project_id) : null;
+      if (!projectId && body.project_key) {
+        const project = await supabase
+          .from("memory_projects")
+          .select("id")
+          .eq("owner_key", "duilio")
+          .eq("project_key", String(body.project_key))
+          .eq("status", "active")
+          .maybeSingle();
+        if (project.error) throw project.error;
+        if (!project.data) return json({ error: "project not found" }, 404);
+        projectId = project.data.id;
+      }
+
+      const marked = await supabase.rpc("fn_mark_memory_used", {
+        p_memory_item_ids: ids,
+        p_owner_key: "duilio",
+        p_actor: String(body.actor ?? "n8n").slice(0, 80),
+        p_action: String(body.usage_action ?? "used_in_response").slice(0, 120),
+        p_project_id: projectId,
+      });
+      if (marked.error) throw marked.error;
+
+      return json({
+        action,
+        requested_count: ids.length,
+        marked_count: marked.data?.length ?? 0,
+        marked: marked.data ?? [],
+        project_id: projectId,
+      });
+    }
 
     if (action === "project_memories") {
       if (!(await authorized(req, "search"))) return json({error:"unauthorized"},401);
