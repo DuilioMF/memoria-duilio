@@ -1,7 +1,8 @@
 {
   "id": "r8EHoms5bF1zJSdL",
   "name": "Memoria Duilio — Marcar memoria usada",
-  "active": false,
+  "active": true,
+  "activeVersionId": "d82ac2e8-1a87-4bd7-85bd-82ee584e3755",
   "nodes": [
     {
       "id": "745cfff0-e7e4-41f8-9528-9c80508bb76d",
@@ -12,7 +13,10 @@
         0,
         0
       ],
-      "parameters": {}
+      "parameters": {
+        "events": "worklfow_call",
+        "inputSource": "passthrough"
+      }
     },
     {
       "id": "3a99bc63-23e2-498c-a146-fc60a6919b63",
@@ -24,14 +28,21 @@
         0
       ],
       "parameters": {
+        "preBuiltAgentsCalloutHttpRequest": "",
+        "curlImport": "",
         "method": "POST",
         "url": "https://pddsehshgfynpmibjqhj.supabase.co/rest/v1/rpc/fn_mark_memory_used",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
+        "provideSslCertificates": false,
+        "sendQuery": false,
+        "sendHeaders": false,
         "sendBody": true,
+        "contentType": "json",
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ p_memory_item_ids: Array.isArray($json.memory_item_ids) ? $json.memory_item_ids : [], p_owner_key: 'duilio', p_actor: $json.actor || 'n8n', p_action: $json.usage_action || 'used_in_response', p_project_id: $json.project_id || null }) }}",
-        "options": {}
+        "options": {},
+        "infoMessage": ""
       },
       "credentials": {
         "supabaseApi": {
@@ -59,7 +70,7 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "versionId": "d166b5b2-313e-4012-8cb2-27b75820a8f8",
-  "exported_at": "2026-09-22T12:00:00Z",
-  "note": "Export real verificado contra n8n. Contiene referencias de credenciales, no secretos."
+  "staticData": null,
+  "exported_at": "2026-09-22T10:36:56-03:00",
+  "note": "Export real verificado por ejecución integrada 9172; contiene referencias de credenciales, no secretos."
 }
