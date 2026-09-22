@@ -1,31 +1,41 @@
 # n8n — Memoria Duilio
 
-## Estado recuperado
+## Estado actual
 
-No se encontró un export persistente de un workflow n8n específico de Memoria Duilio en las fuentes recuperables.
+Existe un workflow n8n real y persistido para registrar el uso efectivo de memorias:
 
-Sí está verificado:
+- workflow: `Memoria Duilio — Marcar memoria usada`;
+- workflow id: `r8EHoms5bF1zJSdL`;
+- estado al exportar: **inactive**;
+- archivo: `n8n/memoria-duilio-mark-memory-used.json`;
+- entrada esperada: `memory_item_ids` como array UUID, con `actor`, `usage_action` y `project_id` opcionales;
+- destino: RPC `public.fn_mark_memory_used`;
+- autenticación: referencia a credencial Supabase existente en n8n, sin secretos versionados.
 
-- conector `Memoria Duilio n8n API`: **connected**;
-- modo: automático;
-- alcance registrado: `phase9_execution_status`;
-- evidencia registrada: ejecución n8n **7577** pudo leer `memory_projects`;
-- los antiguos Edge Functions de inventario/configuración de Fase 9 están deshabilitados intencionalmente (HTTP 410);
-- la sincronización semántica histórica se programó con Supabase `pg_cron` / `pg_net`, no debe fingirse como workflow n8n;
-- la rutina operativa 08:00 tiene ledger propio en Supabase.
+El workflow usa `Execute Sub-workflow Trigger`. Un workflow que recupere Memoria Duilio debe llamarlo después de saber cuáles `memory_item_ids` se usaron realmente para construir la respuesta.
 
-## Regla de recuperación
+## Inventario vivo — 22/09/2026
 
-No crear un workflow ficticio para “llenar” esta carpeta. Cuando exista un export real desde n8n, guardarlo aquí sin credenciales y registrar:
+Se inspeccionaron los workflows reales de n8n por API. En ese momento:
 
-1. workflow id;
-2. nombre;
-3. estado active/inactive;
-4. nodos y conexiones;
-5. versión/fecha;
-6. evidencia de ejecución;
-7. secretos reemplazados por referencias de credenciales.
+- no había workflows que llamaran directamente a `memory_resume_project`;
+- no había workflows que consultaran `memory_items`, `memory_knowledge` o `memory_experiences` de Memoria Duilio;
+- sí había nodos `Postgres Chat Memory`, pero pertenecen a la memoria conversacional propia de n8n y no deben contabilizarse como uso de `memory_items`.
+
+Por esta razón no se modificó ningún workflow productivo ajeno: hacerlo habría generado métricas falsas.
+
+## Integración correcta
+
+Cuando un workflow empiece a consumir Memoria Duilio:
+
+1. recuperar candidatos mediante el API semántico o las tablas de Memoria Duilio;
+2. identificar los `memory_item_id` realmente usados;
+3. pasar sólo esos IDs al subworkflow `Memoria Duilio — Marcar memoria usada`;
+4. verificar la respuesta del RPC;
+5. no marcar todos los candidatos de búsqueda como usados.
+
+El API semántico también dispone de la acción `mark_used` para integraciones que trabajen a través de la Edge Function.
 
 ## Seguridad
 
-Nunca versionar credenciales, tokens, contraseñas, headers privados ni service role.
+Nunca versionar credenciales, tokens, contraseñas, headers privados ni service role. El export conserva únicamente referencias de credenciales de n8n.
