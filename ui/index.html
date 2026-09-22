@@ -12,7 +12,7 @@
     <header class="topbar">
       <div>
         <div class="brand-row"><span class="brain">◉</span><strong>Memoria Duilio</strong><span class="private">Privada</span></div>
-        <div class="subtle">0.1.0-recovery.1 · reconstrucción versionada</div>
+        <div class="subtle">0.4.0 · Centro de control</div>
       </div>
       <button id="refreshBtn" class="ghost">Actualizar</button>
     </header>
@@ -21,6 +21,7 @@
       <button class="tab active" data-tab="talk">Hablar</button>
       <button class="tab" data-tab="projects">Proyectos</button>
       <button class="tab" data-tab="today">Hoy</button>
+      <button class="tab" data-tab="control">Control</button>
     </nav>
 
     <section id="authPanel" class="card hidden">
@@ -75,6 +76,17 @@
           <div id="waitingList"></div>
         </div>
       </div>
+    </section>
+
+    <section id="control" class="panel">
+      <div class="section-head">
+        <div><h2>Centro de control</h2><p class="subtle">Estado operativo real de proyectos, fuentes, ejecución y aprendizaje.</p></div>
+      </div>
+      <div id="controlCounts" class="counts"></div>
+      <h3>Rutina 08:00</h3>
+      <div id="dailyRun"></div>
+      <h3>Proyectos</h3>
+      <div id="controlGrid" class="grid control-grid"></div>
     </section>
 
     <footer>
