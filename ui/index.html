@@ -12,21 +12,21 @@
     <header class="topbar">
       <div>
         <div class="brand-row"><span class="brain">◉</span><strong>Memoria Duilio</strong><span class="private">Privada</span></div>
-        <div class="subtle">0.4.0 · Centro de control</div>
+        <div class="subtle">0.5.0 · Lean 2.0</div>
       </div>
       <button id="refreshBtn" class="ghost">Actualizar</button>
     </header>
 
     <nav class="tabs">
       <button class="tab active" data-tab="talk">Hablar</button>
+      <button class="tab" data-tab="now">Ahora</button>
       <button class="tab" data-tab="projects">Proyectos</button>
-      <button class="tab" data-tab="today">Hoy</button>
-      <button class="tab" data-tab="control">Control</button>
+      <button class="tab" data-tab="learning">Aprendizaje</button>
     </nav>
 
     <section id="authPanel" class="card hidden">
       <h2>Sesión requerida</h2>
-      <p>Esta copia de recuperación no guarda claves privadas. Iniciá sesión con Supabase o usá una sesión inyectada por el entorno.</p>
+      <p>Iniciá sesión con Supabase para acceder a tu memoria.</p>
       <form id="loginForm">
         <input id="email" type="email" autocomplete="username" placeholder="Email" />
         <input id="password" type="password" autocomplete="current-password" placeholder="Contraseña" />
@@ -41,57 +41,39 @@
         <h1>Tocá para hablar</h1>
         <div class="assistant-line"><span class="avatar">D</span><strong>Memoria Duilio</strong></div>
         <label class="switch-row"><input id="speakToggle" type="checkbox" checked /> Escuchar respuesta</label>
-        <p class="prompt">Decime qué querés recordar, decidir o construir.</p>
+        <p class="prompt">Decime qué querés recordar, decidir o hacer.</p>
         <div id="conversation" class="conversation"></div>
         <form id="messageForm" class="composer">
           <input id="messageInput" autocomplete="off" placeholder="Mensaje" />
           <button type="submit">Enviar</button>
         </form>
-        <p class="subtle center">Primero recupera tus recuerdos relevantes · después responde</p>
+        <p class="subtle center">Recupera contexto relevante y usa la fuente correcta.</p>
+      </div>
+    </section>
+
+    <section id="now" class="panel">
+      <div class="section-head"><div><h2>Ahora</h2><p class="subtle">Lo que importa para actuar.</p></div></div>
+      <div id="counts" class="counts"></div>
+      <h3>Ejecutándose</h3>
+      <div id="runningBlock"></div>
+      <div class="split">
+        <div><h3>Pendientes</h3><div id="priorityList"></div></div>
+        <div><h3>Espera de vos</h3><div id="waitingList"></div></div>
       </div>
     </section>
 
     <section id="projects" class="panel">
-      <div class="section-head">
-        <div><h2>Proyectos</h2><p class="subtle">Estado real desde Supabase.</p></div>
-      </div>
-      <div id="runningBlock"></div>
+      <div class="section-head"><div><h2>Proyectos</h2><p class="subtle">Versión, estado y última acción.</p></div></div>
       <div id="projectsGrid" class="grid"></div>
-      <details id="closedWorks" class="closed hidden">
-        <summary>Ver trabajos cerrados (<span id="closedCount">0</span>)</summary>
-        <div id="closedList"></div>
-      </details>
     </section>
 
-    <section id="today" class="panel">
-      <h2>Hoy</h2>
-      <div id="counts" class="counts"></div>
-      <div class="split">
-        <div>
-          <h3>Prioridades</h3>
-          <div id="priorityList"></div>
-        </div>
-        <div>
-          <h3>Espera de vos</h3>
-          <div id="waitingList"></div>
-        </div>
-      </div>
+    <section id="learning" class="panel">
+      <div class="section-head"><div><h2>Aprendizaje</h2><p class="subtle">Conocimiento útil y experiencias pendientes.</p></div></div>
+      <div id="learningCounts" class="counts"></div>
+      <div id="learningList"></div>
     </section>
 
-    <section id="control" class="panel">
-      <div class="section-head">
-        <div><h2>Centro de control</h2><p class="subtle">Estado operativo real de proyectos, fuentes, ejecución y aprendizaje.</p></div>
-      </div>
-      <div id="controlCounts" class="counts"></div>
-      <h3>Rutina 08:00</h3>
-      <div id="dailyRun"></div>
-      <h3>Proyectos</h3>
-      <div id="controlGrid" class="grid control-grid"></div>
-    </section>
-
-    <footer>
-      <span id="statusText">Sin sincronizar</span>
-    </footer>
+    <footer><span id="statusText">Sin sincronizar</span></footer>
   </main>
   <script src="./config.js"></script>
   <script type="module" src="./app.js"></script>

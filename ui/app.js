@@ -1,25 +1,23 @@
 const cfg = window.MEMORIA_CONFIG || {};
-const state = { home: null, control: null, token: cfg.accessToken || sessionStorage.getItem("memoria_access_token") || "" };
-
+const state = { home: null, token: cfg.accessToken || sessionStorage.getItem("memoria_access_token") || "" };
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
 const fmt = (v) => {
   if (!v || String(v).startsWith("1970-")) return "—";
   try { return new Intl.DateTimeFormat("es-AR",{dateStyle:"short",timeStyle:"short"}).format(new Date(v)); } catch { return String(v); }
 };
-
 function setStatus(text){ $("statusText").textContent = text; }
 function authHeaders(){
   const headers = {"content-type":"application/json"};
   if (cfg.anonKey) headers.apikey = cfg.anonKey;
-  if (state.token) headers.authorization = `Bearer ${state.token}`;
+  if (state.token) headers.authorization = "Bearer " + state.token;
   return headers;
 }
 async function api(body){
   const r = await fetch(cfg.apiUrl,{method:"POST",headers:authHeaders(),body:JSON.stringify(body)});
   if (r.status === 401) { showAuth(true); throw new Error("Sesión requerida"); }
   const data = await r.json().catch(()=>({}));
-  if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
+  if (!r.ok || data?.ok === false) throw new Error(data?.error || ("HTTP " + r.status));
   return data.data ?? data.result ?? data;
 }
 async function semantic(query){
@@ -29,10 +27,9 @@ async function semantic(query){
   return await r.json().catch(()=>null);
 }
 function showAuth(show){ $("authPanel").classList.toggle("hidden",!show); }
-
 async function login(email,password){
   if (!cfg.supabaseUrl || !cfg.anonKey) throw new Error("El entorno no tiene anonKey configurada.");
-  const r = await fetch(`${cfg.supabaseUrl}/auth/v1/token?grant_type=password`,{
+  const r = await fetch(cfg.supabaseUrl + "/auth/v1/token?grant_type=password",{
     method:"POST",headers:{"content-type":"application/json",apikey:cfg.anonKey},
     body:JSON.stringify({email,password})
   });
@@ -43,109 +40,40 @@ async function login(email,password){
   showAuth(false);
   await refreshHome();
 }
-
 function countCard(label,value){
-  return `<div class="count"><span>${esc(label)}</span><strong>${esc(value ?? 0)}</strong></div>`;
+  return '<div class="count"><span>'+esc(label)+'</span><strong>'+esc(value ?? 0)+'</strong></div>';
 }
 function projectCard(p){
   const live = ["running","active","blocked"].includes(String(p.execution_state || "").toLowerCase());
-  return `<article class="project">
-    <div style="display:flex;justify-content:space-between;gap:8px">
-      <h3>${esc(p.project_name)}</h3><span class="badge ${live?"live":""}">${esc(p.execution_state || "idle")}</span>
-    </div>
-    <div class="meta">
-      <span>Ejecutor</span><span>${esc(p.executor || "—")}</span>
-      <span>Versión</span><span>${esc(p.version || "—")}</span>
-      <span>Última acción</span><span>${esc(p.last_action || "—")}</span>
-      <span>Última señal</span><span>${esc(fmt(p.last_activity_at || p.last_event_at))}</span>
-      <span>Conector</span><span>${esc(p.connector_status || "—")}</span>
-    </div>
-  </article>`;
+  return '<article class="project"><div class="project-title"><h3>'+esc(p.project_name)+'</h3><span class="badge '+(live?"live":"")+'">'+esc(p.execution_state || "idle")+'</span></div><div class="meta"><span>Versión</span><span>'+esc(p.version || "—")+'</span><span>Ejecutor</span><span>'+esc(p.executor || "—")+'</span><span>Última acción</span><span>'+esc(p.last_action || "—")+'</span><span>Última señal</span><span>'+esc(fmt(p.last_activity_at || p.last_event_at))+'</span></div></article>';
 }
 function runCard(r){
-  return `<div class="run"><strong>${esc(r.project_name || r.project_key || "Ejecución")}</strong>
-  <div class="meta"><span>Ejecutor</span><span>${esc(r.executor || "—")}</span><span>Estado</span><span>${esc(r.state || r.observed_state || "—")}</span>
-  <span>Acción</span><span>${esc(r.last_action || "—")}</span><span>Heartbeat</span><span>${esc(fmt(r.heartbeat_at))}</span></div></div>`;
+  return '<div class="run"><strong>'+esc(r.project_name || r.project_key || "Ejecución")+'</strong><div class="meta"><span>Ejecutor</span><span>'+esc(r.executor || "—")+'</span><span>Estado</span><span>'+esc(r.state || "—")+'</span><span>Acción</span><span>'+esc(r.last_action || "—")+'</span><span>Última señal</span><span>'+esc(fmt(r.last_activity_at || r.heartbeat_at))+'</span></div></div>';
 }
-function controlProjectCard(p){
-  const stateClass = ["running","blocked","stale_run","source_missing","source_stale"].includes(String(p.operational_state||"")) ? "live" : "";
-  return `<article class="project control-project">
-    <div class="project-title"><h3>${esc(p.project_name)}</h3><span class="badge ${stateClass}">${esc(p.operational_state || "idle")}</span></div>
-    <div class="meta">
-      <span>Proyecto padre</span><span>${esc(p.parent_project_name || "—")}</span>
-      <span>Versión</span><span>${esc(p.current_version || "—")}</span>
-      <span>Autoridad</span><span>${esc(p.version_authority || "—")}</span>
-      <span>Fuentes</span><span>${esc(`${p.sources_fresh||0} frescas · ${p.sources_stale||0} stale · ${p.sources_missing||0} faltantes`)}</span>
-      <span>Queue</span><span>${esc(p.queue_state || "—")}</span>
-      <span>Ejecutor</span><span>${esc(p.executor_key || p.run_executor || "—")}</span>
-      <span>Heartbeat</span><span>${esc(fmt(p.heartbeat_at))}</span>
-      <span>Última acción</span><span>${esc(p.last_action || "—")}</span>
-      <span>Memorias</span><span>${esc(`${p.verified_memories||0} verificadas · ${p.recorded_memories||0} registradas`)}</span>
-      <span>Aprendizaje</span><span>${esc(`${p.pending_experiences||0} exp. pendientes · ${p.candidate_knowledge||0} candidatos · ${p.active_knowledge||0} activos`)}</span>
-    </div>
-  </article>`;
-}
-function renderControl(control){
-  state.control = control;
-  const totals = control?.totals || {};
-  $("controlCounts").innerHTML =
-    countCard("Proyectos",totals.projects)+
-    countCard("Ejecutando",totals.running)+
-    countCard("En cola",totals.queued)+
-    countCard("Bloqueados",totals.blocked)+
-    countCard("Stale",totals.stale_runs)+
-    countCard("Problemas fuente",totals.source_issues)+
-    countCard("Experiencias pendientes",totals.pending_experiences)+
-    countCard("Conocimiento activo",totals.active_knowledge);
-  $("controlGrid").innerHTML = (control?.projects || []).map(controlProjectCard).join("");
-  const daily = control?.last_daily_run;
-  $("dailyRun").innerHTML = daily
-    ? `<div class="run"><strong>Rutina 08:00 · ${esc(daily.status || "—")}</strong><div class="meta">
-        <span>Run</span><span>${esc(daily.run_key || "—")}</span>
-        <span>Paso</span><span>${esc(daily.step || "—")}</span>
-        <span>Inicio</span><span>${esc(fmt(daily.started_at))}</span>
-        <span>Fin</span><span>${esc(fmt(daily.finished_at))}</span>
-        <span>Resumen</span><span>${esc(daily.summary || "—")}</span>
-      </div></div>`
-    : "<p class='subtle'>Sin corrida diaria registrada.</p>";
+function learningCard(k){
+  return '<article class="project"><div class="project-title"><h3>'+esc(k.title || "Aprendizaje")+'</h3><span class="badge">'+esc(k.status || "—")+'</span></div><p>'+esc(k.statement || "—")+'</p><div class="subtle">'+esc(k.type || "general")+' · evidencia '+esc(k.evidence_count ?? 0)+' · confianza '+esc(k.confidence ?? "—")+'</div></article>';
 }
 function renderHome(home){
   state.home = home;
   const t = home.today || {};
   const c = t.counts || {};
-  $("counts").innerHTML =
-    countCard("Por hacer",c.por_hacer)+countCard("En prueba",c.en_prueba)+countCard("En ejecución",c.en_ejecucion)+countCard("Espera de vos",c.espera_de_vos)+countCard("Ejecuciones reales",c.ejecuciones_reales);
-
-  $("priorityList").innerHTML = (t.priority_items || []).map(x => `<article class="priority"><h4>${esc(x.title)}</h4><span class="badge">${esc(x.state)}</span> ${x.card_url?`<a href="${esc(x.card_url)}" target="_blank" rel="noreferrer">Trello</a>`:""}</article>`).join("") || "<p class='subtle'>Sin prioridades.</p>";
-  $("waitingList").innerHTML = (home.waiting_for_you || []).map(x => `<article class="waiting">${esc(x.title || x.project_name || JSON.stringify(x))}</article>`).join("") || "<p class='subtle'>Nada espera de vos ahora.</p>";
-
-  const projects = home.projects || [];
-  $("projectsGrid").innerHTML = projects.map(projectCard).join("");
+  $("counts").innerHTML = countCard("Por hacer",c.por_hacer)+countCard("En ejecución",c.en_ejecucion)+countCard("En prueba",c.en_prueba)+countCard("Espera de vos",c.espera_de_vos);
   const running = home.running || [];
-  $("runningBlock").innerHTML = running.length ? `<h3>Ejecutándose</h3>${running.map(runCard).join("")}` : "<p class='subtle'>No hay ejecuciones reales activas.</p>";
-
-  // La API home solo expone ejecuciones activas. Los cerrados se mantienen plegados
-  // si el hosting agrega closed_runs en una versión posterior.
-  const closed = home.closed_runs || [];
-  $("closedCount").textContent = closed.length;
-  $("closedList").innerHTML = closed.map(runCard).join("");
-  $("closedWorks").classList.toggle("hidden",!closed.length);
-
+  $("runningBlock").innerHTML = running.length ? running.map(runCard).join("") : "<p class='subtle'>No hay ejecuciones reales activas.</p>";
+  $("priorityList").innerHTML = (t.priority_items || []).map(x => '<article class="priority"><h4>'+esc(x.title)+'</h4><span class="badge">'+esc(x.state)+'</span> '+(x.card_url?'<a href="'+esc(x.card_url)+'" target="_blank" rel="noreferrer">Trello</a>':"")+'</article>').join("") || "<p class='subtle'>Sin pendientes prioritarios.</p>";
+  $("waitingList").innerHTML = (home.waiting_for_you || []).map(x => '<article class="waiting">'+esc(x.title || x.project_name || "Pendiente")+'</article>').join("") || "<p class='subtle'>Nada espera de vos ahora.</p>";
+  $("projectsGrid").innerHTML = (home.projects || []).map(projectCard).join("");
+  const l = home.learning || {};
+  $("learningCounts").innerHTML = countCard("Activos",l.active)+countCard("Candidatos",l.candidate)+countCard("Experiencias pendientes",l.pending_experiences)+countCard("Aprendidas",l.learned_experiences);
+  $("learningList").innerHTML = (l.recent || []).map(learningCard).join("") || "<p class='subtle'>Todavía no hay conocimiento reciente para mostrar.</p>";
   const sync = t.trello_sync?.last_sync_at;
-  setStatus(`Actualizado ${fmt(home.generated_at)}${sync?` · Trello ${fmt(sync)}`:""}`);
+  setStatus("Actualizado "+fmt(home.generated_at)+(sync?(" · Trello "+fmt(sync)):"")+" · "+esc(home.operating_model_version || "Lean 2.0"));
 }
-
 async function refreshHome(){
   setStatus("Actualizando…");
   try{
     const home = await api({action:"home"});
     renderHome(home);
-    try {
-      const control = await api({action:"control_center"});
-      renderControl(control);
-    } catch (controlError) {
-      $("controlGrid").innerHTML = `<p class="subtle">Centro de control no disponible: ${esc(controlError.message)}</p>`;
-    }
     showAuth(false);
   }catch(e){
     setStatus(e.message);
@@ -154,7 +82,7 @@ async function refreshHome(){
 }
 function addBubble(text,who="assistant"){
   const el = document.createElement("div");
-  el.className = `bubble ${who}`;
+  el.className = "bubble " + who;
   el.textContent = text;
   $("conversation").appendChild(el);
   $("conversation").scrollTop = $("conversation").scrollHeight;
@@ -178,14 +106,12 @@ async function handleMessage(raw){
     pending.remove();
     const learned = mem?.results || [];
     const snippets = learned.slice(0,3).map(x=>x.title || x.content || x.chunk_content).filter(Boolean);
-    let answer = "Plan de Memoria: ";
-    const route = plan?.source?.name || plan?.source_name || plan?.source || plan?.executor?.display_name || plan?.executor || "";
-    answer += route ? `consultar ${typeof route==="string"?route:"las fuentes vigentes"}.` : "usar las fuentes vigentes.";
-    if (snippets.length) answer += "\n\nRecuerdos relevantes:\n• "+snippets.join("\n• ");
+    const source = plan?.source_plan?.source?.display_name || plan?.source_plan?.source?.system_key || "la fuente correcta";
+    let answer = "Plan de Memoria: consultar " + source + ".";
+    if (snippets.length) answer += "\n\nRecuerdos relevantes:\n• " + snippets.join("\n• ");
     addBubble(answer); speak(answer);
   }catch(e){ pending.remove(); addBubble(e.message,"error"); }
 }
-
 document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===btn));
   document.querySelectorAll(".panel").forEach(x=>x.classList.toggle("active",x.id===btn.dataset.tab));
@@ -196,7 +122,6 @@ $("loginForm").addEventListener("submit",async e=>{
   e.preventDefault(); $("authMessage").textContent="Entrando…";
   try{await login($("email").value,$("password").value);$("authMessage").textContent="";}catch(err){$("authMessage").textContent=err.message;}
 });
-
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SpeechRecognition){
   const rec = new SpeechRecognition(); rec.lang="es-AR"; rec.interimResults=false;
@@ -208,4 +133,4 @@ if (SpeechRecognition){
   $("micBtn").title="Reconocimiento de voz no disponible en este navegador";
 }
 refreshHome();
-setInterval(refreshHome,60000);
+setInterval(refreshHome,300000);
