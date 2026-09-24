@@ -1,27 +1,16 @@
--- Memoria Duilio 0.6.6: three-card pilot gate.
--- This migration is equivalent to deployed executable_cards_pilot_closure_gate_v1.
-create table if not exists public.memory_card_delivery_gates(
-card_url text primary key check(card_url ~ '^https://trello[.]com/c/[A-Za-z0-9]+$'),
-project_key text not null,
-delivery_kind text not null check(delivery_kind in ('software','field_validation','document_validation')),
-specification_ref text not null,
-specification_status text not null default 'pilot' check(specification_status in ('pilot','ready','needs_clarification')),
-required_case_ids text[] not null default array[]::text[],
-requires_ci boolean not null default false,
-requires_release boolean not null default false,
-requires_rollback boolean not null default false,
-requires_human_approval boolean not null default true,
-intended_executor_key text null references public.memory_executor_registry(executor_key),
-case_evidence jsonb not null default '[]'::jsonb check(jsonb_typeof(case_evidence)='array'),
-ci_evidence jsonb not null default '{}'::jsonb check(jsonb_typeof(ci_evidence)='object'),
-release_evidence jsonb not null default '{}'::jsonb check(jsonb_typeof(release_evidence)='object'),
-rollback_evidence jsonb not null default '{}'::jsonb check(jsonb_typeof(rollback_evidence)='object'),
-human_approval jsonb not null default '{}'::jsonb check(jsonb_typeof(human_approval)='object'),
-incident_history jsonb not null default '[]'::jsonb check(jsonb_typeof(incident_history)='array'),
-created_at timestamptz not null default now(),updated_at timestamptz not null default now());
-alter table public.memory_card_delivery_gates enable row level security;
-revoke all on public.memory_card_delivery_gates from public,anon,authenticated;
-grant select,insert,update on public.memory_card_delivery_gates to service_role;
+-- 0.6.7: human approval MUST originate from a verified authorized Trello member.
+alter table public.memory_card_delivery_gates
+ add column if not exists required_approver text not null default 'duilio';
+alter table public.memory_card_delivery_gates
+ add column if not exists trello_approver_member_id text;
+update public.memory_card_delivery_gates
+set required_approver='duilio',
+ trello_approver_member_id='ari:cloud:trello::user/5fab1bda9c115e314ae3193d'
+where card_url in (
+ 'https://trello.com/c/Gk6jvAIY',
+ 'https://trello.com/c/Ju1hmWW9',
+ 'https://trello.com/c/T2xmrKV5'
+);
 CREATE OR REPLACE FUNCTION public.memory_card_closure_gate(p_card_url text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -97,8 +86,12 @@ begin
 
   if g.requires_human_approval and not (
     lower(g.human_approval->>'result')='approved'
-    and length(btrim(coalesce(g.human_approval->>'actor','')))>0
-    and length(btrim(coalesce(g.human_approval->>'evidence_ref','')))>0
+    and lower(g.human_approval->>'actor')=lower(g.required_approver)
+    and g.human_approval->>'source'='trello_member_verified'
+    and coalesce(g.human_approval->>'member_id','')=coalesce(g.trello_approver_member_id,'')
+    and g.trello_approver_member_id is not null
+    and (g.human_approval->>'evidence_ref') ~ '^https://trello[.]com/c/[A-Za-z0-9]+'
+    and (g.human_approval->>'verified_at') is not null
   ) then
     v_missing:=array_append(v_missing,'explicit_human_approval_missing');
   end if;
@@ -115,8 +108,3 @@ end $function$;
 
 revoke execute on function public.memory_card_closure_gate(text) from public,anon,authenticated;
 grant execute on function public.memory_card_closure_gate(text) to service_role;
-create or replace view public.memory_card_closure_audit_v with (security_invoker=true)
-as select g.card_url,g.project_key,g.delivery_kind,g.specification_status,
-public.memory_card_closure_gate(g.card_url) as decision from public.memory_card_delivery_gates g;
-revoke all on public.memory_card_closure_audit_v from public,anon,authenticated;
-grant select on public.memory_card_closure_audit_v to service_role;
