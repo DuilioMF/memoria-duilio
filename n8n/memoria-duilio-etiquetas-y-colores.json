@@ -1,0 +1,463 @@
+{
+  "name": "Memoria Duilio — Etiquetas y colores automáticos",
+  "nodes": [
+    {
+      "id": "every_5_minutes",
+      "name": "Every 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        220,
+        340
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "registry_for_colors",
+      "name": "Registry for colors",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        500,
+        100
+      ],
+      "parameters": {
+        "url": "https://pddsehshgfynpmibjqhj.supabase.co/rest/v1/rpc/memory_trello_label_manifest",
+        "method": "POST",
+        "jsonBody": "={}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_YOUR_supabaseApi_CREDENTIAL",
+          "name": "Connect supabaseApi in n8n"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "existing_board_labels",
+      "name": "Existing board labels",
+      "type": "n8n-nodes-base.trello",
+      "position": [
+        750,
+        100
+      ],
+      "parameters": {
+        "boardId": {
+          "mode": "id",
+          "value": "6aa35638b2a5a021d29b646b"
+        },
+        "resource": "label",
+        "operation": "getAll",
+        "returnAll": true,
+        "authentication": "apiKey"
+      },
+      "credentials": {
+        "trelloApi": {
+          "id": "REPLACE_WITH_YOUR_trelloApi_CREDENTIAL",
+          "name": "Connect trelloApi in n8n"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "plan_missing_labels",
+      "name": "Plan missing labels",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        980,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst registry=$(\"Registry for colors\").first().json;\nconst manifest=registry.projects?registry:registry.body||registry;\nif(!Array.isArray(manifest.projects))throw new Error(\"MANIFEST_INVALID\");\nconst labels=$input.all().map(x=>x.json);\nconst existing=new Set(labels.map(x=>String(x.name||\"\").trim().toLowerCase()));\nconst emitted=new Set();\nconst result=[];\nfor(const p of manifest.projects){\n  const label=String(p.label_name||\"\").trim();\n  if(!label || !p.label_color)continue;\n  const key=label.toLowerCase();\n  if(existing.has(key)||emitted.has(key))continue;\n  emitted.add(key);\n  result.push({json:{project_key:p.project_key,label_name:label,label_color:p.label_color}});\n}\nreturn result;\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "create_missing_label",
+      "name": "Create missing label",
+      "type": "n8n-nodes-base.trello",
+      "position": [
+        1220,
+        100
+      ],
+      "parameters": {
+        "name": "={{$json.label_name}}",
+        "color": "={{$json.label_color}}",
+        "boardId": {
+          "mode": "id",
+          "value": "6aa35638b2a5a021d29b646b"
+        },
+        "resource": "label",
+        "operation": "create",
+        "authentication": "apiKey"
+      },
+      "credentials": {
+        "trelloApi": {
+          "id": "REPLACE_WITH_YOUR_trelloApi_CREDENTIAL",
+          "name": "Connect trelloApi in n8n"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "record_label_in_registry",
+      "name": "Record label in registry",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1460,
+        100
+      ],
+      "parameters": {
+        "url": "https://pddsehshgfynpmibjqhj.supabase.co/rest/v1/rpc/memory_trello_register_label",
+        "method": "POST",
+        "jsonBody": "={{JSON.stringify({p_label_name:$json.name,p_label_id:$json.id,p_color:$json.color})}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_YOUR_supabaseApi_CREDENTIAL",
+          "name": "Connect supabaseApi in n8n"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "registry_for_cards",
+      "name": "Registry for cards",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        500,
+        480
+      ],
+      "parameters": {
+        "url": "https://pddsehshgfynpmibjqhj.supabase.co/rest/v1/rpc/memory_trello_label_manifest",
+        "method": "POST",
+        "jsonBody": "={}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_YOUR_supabaseApi_CREDENTIAL",
+          "name": "Connect supabaseApi in n8n"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "board_labels_for_cards",
+      "name": "Board labels for cards",
+      "type": "n8n-nodes-base.trello",
+      "position": [
+        750,
+        480
+      ],
+      "parameters": {
+        "boardId": {
+          "mode": "id",
+          "value": "6aa35638b2a5a021d29b646b"
+        },
+        "resource": "label",
+        "operation": "getAll",
+        "returnAll": true,
+        "authentication": "apiKey"
+      },
+      "credentials": {
+        "trelloApi": {
+          "id": "REPLACE_WITH_YOUR_trelloApi_CREDENTIAL",
+          "name": "Connect trelloApi in n8n"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "get_trello_board_cards",
+      "name": "Get Trello board cards",
+      "type": "n8n-nodes-base.trello",
+      "position": [
+        1220,
+        480
+      ],
+      "parameters": {
+        "id": "={{$json.id}}",
+        "resource": "list",
+        "operation": "getCards",
+        "returnAll": true,
+        "authentication": "apiKey",
+        "additionalFields": {
+          "fields": "id,name,idLabels,closed"
+        }
+      },
+      "credentials": {
+        "trelloApi": {
+          "id": "REPLACE_WITH_YOUR_trelloApi_CREDENTIAL",
+          "name": "Connect trelloApi in n8n"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "plan_label_assignments",
+      "name": "Plan label assignments",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1460,
+        380
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst registry=$(\"Registry for cards\").first().json;\nconst manifest=registry.projects?registry:registry.body||registry;\nif(!Array.isArray(manifest.projects))throw new Error(\"MANIFEST_INVALID\");\nconst labels=$(\"Board labels for cards\").all().map(x=>x.json);\nconst ids=new Map(labels.map(x=>[String(x.name||\"\").trim().toLowerCase(),x.id]));\nconst rows=$input.all().flatMap(x=>Array.isArray(x.json)?x.json:[x.json]);\nconst clean=s=>String(s||\"\").normalize(\"NFD\").replace(/[\\u0300-\\u036f]/g,\"\").toLowerCase().trim();\nconst starts=(title,prefix)=>{const t=clean(title),p=clean(prefix);return !!p && (t===p||t.startsWith(p+\" \")||t.startsWith(p+\" —\")||t.startsWith(p+\":\"));};\nconst out=[];\nfor(const c of rows){\n if(!c?.id||!c.name||c.closed)continue;\n let targets=[];\n if(starts(c.name,\"Supervisión / Reloj Feli\")){\n    targets=manifest.projects.filter(p=>[\"supervision\",\"feli-salud\"].includes(p.project_key));\n }else{\n    const matches=manifest.projects.filter(p=>starts(c.name,p.title_prefix));\n    matches.sort((a,b)=>String(b.title_prefix).length-String(a.title_prefix).length);\n    if(matches.length)targets=[matches[0]];\n    else{\n      const byLabel=manifest.projects.filter(p=>{\n        const id=ids.get(String(p.label_name||\"\").toLowerCase());\n        return id && (c.idLabels||[]).includes(id);\n      });\n      const children=byLabel.filter(p=>p.inherited_from);\n      if(children.length===1)targets=children;\n      else if(byLabel.length===1)targets=byLabel;\n    }\n }\n for(const p of targets){\n  const id=ids.get(String(p.label_name||\"\").toLowerCase());\n  if(id && !(c.idLabels||[]).includes(id)){\n    out.push({json:{card_id:c.id,label_id:id,project_key:p.project_key}});\n  }\n }\n}\nreturn out;\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "attach_project_label",
+      "name": "Attach project label",
+      "type": "n8n-nodes-base.trello",
+      "position": [
+        1680,
+        380
+      ],
+      "parameters": {
+        "id": "={{$json.label_id}}",
+        "cardId": {
+          "mode": "id",
+          "value": "={{$json.card_id}}"
+        },
+        "resource": "label",
+        "operation": "addLabel",
+        "authentication": "apiKey"
+      },
+      "credentials": {
+        "trelloApi": {
+          "id": "REPLACE_WITH_YOUR_trelloApi_CREDENTIAL",
+          "name": "Connect trelloApi in n8n"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "plan_safe_title_repairs",
+      "name": "Plan safe title repairs",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1460,
+        600
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst registry=$(\"Registry for cards\").first().json;\nconst manifest=registry.projects?registry:registry.body||registry;\nif(!Array.isArray(manifest.projects))throw new Error(\"MANIFEST_INVALID\");\nconst labels=$(\"Board labels for cards\").all().map(x=>x.json);\nconst ids=new Map(labels.map(l=>[String(l.name||\"\").toLowerCase(),l.id]));\nconst rows=$input.all().flatMap(x=>Array.isArray(x.json)?x.json:[x.json]);\nconst clean=s=>String(s||\"\").normalize(\"NFD\").replace(/[\\u0300-\\u036f]/g,\"\").toLowerCase().trim();\nconst starts=(t,p)=>{t=clean(t);p=clean(p);return !!p&&(t===p||t.startsWith(p+\" \")||t.startsWith(p+\" —\")||t.startsWith(p+\":\"));};\nconst out=[];\nfor(const c of rows){\n if(!c?.id||!c.name||c.closed||starts(c.name,\"Supervisión / Reloj Feli\"))continue;\n const already=manifest.projects.filter(p=>starts(c.name,p.title_prefix));\n if(already.length)continue;\n const byLabel=manifest.projects.filter(p=>{\n   const id=ids.get(String(p.label_name||\"\").toLowerCase());\n   return id&&(c.idLabels||[]).includes(id);\n });\n const children=byLabel.filter(p=>p.inherited_from);\n const selected=children.length===1?children:byLabel.length===1?byLabel:[];\n if(selected.length!==1)continue;\n const p=selected[0];\n if(!p.title_prefix)continue;\n const title=p.title_prefix+\" — \"+String(c.name).trim();\n if(title.length>512)continue;\n out.push({json:{card_id:c.id,title,original:c.name,project_key:p.project_key}});\n}\nreturn out;\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "prefix_project_to_title",
+      "name": "Prefix project to title",
+      "type": "n8n-nodes-base.trello",
+      "position": [
+        1470,
+        600
+      ],
+      "parameters": {
+        "id": {
+          "mode": "id",
+          "value": "={{$json.card_id}}"
+        },
+        "resource": "card",
+        "operation": "update",
+        "updateFields": {
+          "name": "={{$json.title}}"
+        },
+        "authentication": "apiKey"
+      },
+      "credentials": {
+        "trelloApi": {
+          "id": "REPLACE_WITH_YOUR_trelloApi_CREDENTIAL",
+          "name": "Connect trelloApi in n8n"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "get_board_lists",
+      "name": "Get Board Lists",
+      "type": "n8n-nodes-base.trello",
+      "position": [
+        990,
+        480
+      ],
+      "parameters": {
+        "id": "6aa35638b2a5a021d29b646b",
+        "resource": "list",
+        "operation": "getAll",
+        "returnAll": true,
+        "authentication": "apiKey"
+      },
+      "credentials": {
+        "trelloApi": {
+          "id": "REPLACE_WITH_YOUR_trelloApi_CREDENTIAL",
+          "name": "Connect trelloApi in n8n"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "connections": {
+    "Every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Registry for colors",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Registry for cards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Board Lists": {
+      "main": [
+        [
+          {
+            "node": "Get Trello board cards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registry for cards": {
+      "main": [
+        [
+          {
+            "node": "Board labels for cards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan missing labels": {
+      "main": [
+        [
+          {
+            "node": "Create missing label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registry for colors": {
+      "main": [
+        [
+          {
+            "node": "Existing board labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create missing label": {
+      "main": [
+        [
+          {
+            "node": "Record label in registry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Existing board labels": {
+      "main": [
+        [
+          {
+            "node": "Plan missing labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Board labels for cards": {
+      "main": [
+        [
+          {
+            "node": "Get Board Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Trello board cards": {
+      "main": [
+        [
+          {
+            "node": "Plan label assignments",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Plan safe title repairs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan label assignments": {
+      "main": [
+        [
+          {
+            "node": "Attach project label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan safe title repairs": {
+      "main": [
+        [
+          {
+            "node": "Prefix project to title",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
