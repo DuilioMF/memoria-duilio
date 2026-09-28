@@ -1,0 +1,39 @@
+name: Memoria Duilio - UI checks
+
+on:
+  pull_request:
+    paths:
+      - "ui/**"
+      - ".github/workflows/md-ui-check.yml"
+      - "supabase/functions/memoria-home/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Typecheck authenticated Edge Function
+        run: deno check supabase/functions/memoria-home/index.ts
+      - name: Verify JavaScript syntax
+        run: node --check ui/app.js
+      - name: Verify Control tab elements
+        run: |
+          grep -q 'data-tab="control"' ui/index.html
+          grep -q 'id="controlProjects"' ui/index.html
+          grep -q 'async function refreshControl' ui/app.js
+      - name: Refuse privileged browser keys
+        run: |
+          if grep -Ein 'service_role|SUPABASE_SERVICE_ROLE_KEY|sb_secret_' ui/app.js ui/config.js; then
+            echo "Privileged credential reference in UI"
+            exit 1
+          fi

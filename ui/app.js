@@ -39,6 +39,7 @@ async function login(email,password){
   sessionStorage.setItem("memoria_access_token",state.token);
   showAuth(false);
   await refreshHome();
+  if (document.querySelector('.tab.active')?.dataset.tab === 'control') await refreshControl();
 }
 function countCard(label,value){
   return '<div class="count"><span>'+esc(label)+'</span><strong>'+esc(value ?? 0)+'</strong></div>';
@@ -68,6 +69,45 @@ function renderHome(home){
   $("learningList").innerHTML = (l.recent || []).map(learningCard).join("") || "<p class='subtle'>Todavía no hay conocimiento reciente para mostrar.</p>";
   const sync = t.trello_sync?.last_sync_at;
   setStatus("Actualizado "+fmt(home.generated_at)+(sync?(" · Trello "+fmt(sync)):"")+" · "+esc(home.operating_model_version || "Lean 2.0"));
+}
+function renderControl(data){
+  const totals = data?.totals || {};
+  $("controlCounts").innerHTML =
+    countCard("Proyectos", totals.projects) +
+    countCard("Ejecutándose", totals.running) +
+    countCard("Bloqueos", totals.blocked) +
+    countCard("Ejecuciones vencidas", totals.stale_runs) +
+    countCard("Problemas de fuentes", totals.source_issues);
+  const projects = Array.isArray(data?.projects) ? data.projects : [];
+  $("controlProjects").innerHTML = projects.map(p => {
+    const status = p.run_state || p.queue_state || p.operational_state || "idle";
+    const isLive = status === "running";
+    return '<article class="project"><div class="project-title"><h3>' +
+      esc(p.project_name || p.project_key) + '</h3><span class="badge ' +
+      (isLive ? "live" : "") + '">' + esc(status) + '</span></div><div class="meta">' +
+      '<span>Versión</span><span>' + esc(p.current_version || "—") + '</span>' +
+      '<span>Ejecutor</span><span>' + esc(p.run_executor || p.executor_key || "—") + '</span>' +
+      '<span>Última acción</span><span>' + esc(p.last_action || "—") + '</span>' +
+      '<span>Última señal</span><span>' + esc(fmt(p.heartbeat_at || p.run_started_at)) + '</span>' +
+      '</div></article>';
+  }).join("") || "<p class='subtle'>No hay proyectos disponibles para esta sesión.</p>";
+  $("controlStatus").textContent = "Datos reales de Supabase · " + fmt(data?.as_of);
+}
+async function refreshControl(){
+  if (!state.token) {
+    showAuth(true);
+    $("controlStatus").textContent = "Iniciá sesión para consultar el Centro de control.";
+    $("controlCounts").replaceChildren();
+    $("controlProjects").replaceChildren();
+    return;
+  }
+  $("controlStatus").textContent = "Consultando Supabase…";
+  try { renderControl(await api({action:"control_center"})); }
+  catch (e) {
+    $("controlCounts").replaceChildren();
+    $("controlProjects").replaceChildren();
+    $("controlStatus").textContent = "No se pudo consultar: " + e.message;
+  }
 }
 async function refreshHome(){
   setStatus("Actualizando…");
@@ -115,8 +155,9 @@ async function handleMessage(raw){
 document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===btn));
   document.querySelectorAll(".panel").forEach(x=>x.classList.toggle("active",x.id===btn.dataset.tab));
+  if (btn.dataset.tab === "control") refreshControl();
 }));
-$("refreshBtn").addEventListener("click",refreshHome);
+$("refreshBtn").addEventListener("click",()=>document.querySelector(".tab.active")?.dataset.tab === "control" ? refreshControl() : refreshHome());
 $("messageForm").addEventListener("submit",e=>{e.preventDefault();handleMessage($("messageInput").value);});
 $("loginForm").addEventListener("submit",async e=>{
   e.preventDefault(); $("authMessage").textContent="Entrando…";
