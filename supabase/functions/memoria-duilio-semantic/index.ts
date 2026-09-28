@@ -252,7 +252,7 @@ Deno.serve(async (req) => {
 
     if (action === "backfill_items") {
       // This action is deliberately NOT available to UI/search/capture tokens.
-      if (!isServiceRequest(req)) return json({ error: "service_role_required" }, 403);
+      if (!(await authorized(req, "sync"))) return json({ error: "sync_capability_required" }, 403);
       const result = await backfillMemoryItems(Number(body.limit ?? 5));
       return json({ action, ...result });
     }
