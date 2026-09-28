@@ -1,0 +1,98 @@
+name: MD - Propuesta acotada por tarjeta
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_json:
+        description: "JSON con card_url, queue_id, run_key, titulo/problema y allowed_files"
+        required: true
+        type: string
+  repository_dispatch:
+    types: [md_propose]
+  pull_request:
+    paths:
+      - "scripts/md_proposal_worker.py"
+      - "tests/test_md_proposal_worker.py"
+      - ".github/workflows/md-proposal-worker.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: md-proposal-${{ github.event.client_payload.queue_id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify worker syntax and safety tests
+        run: |
+          python -m py_compile scripts/md_proposal_worker.py
+          python -m unittest discover -s tests -p 'test_md_proposal_worker.py' -v
+
+  propose:
+    if: github.event_name != 'pull_request'
+    needs: offline-tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      MD_TASK_JSON: ${{ github.event_name == 'repository_dispatch' && toJSON(github.event.client_payload) || inputs.task_json }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: gpt-4.1-mini
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Reject duplicate PR for same queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          QUEUE_ID=$(python -c 'import json,os; print(json.loads(os.environ["MD_TASK_JSON"])["queue_id"])')
+          python -c 'import re,sys; assert re.fullmatch(r"[0-9a-fA-F-]{36}",sys.argv[1])' "$QUEUE_ID"
+          if gh pr list --state all --json body,url --limit 100 |
+            jq -e --arg q "$QUEUE_ID" '[.[] | select((.body // "") | contains($q))] | length > 0' >/dev/null; then
+            echo "Ya existe PR para este queue_id; no duplicar trabajo"
+            exit 1
+          fi
+      - name: Ask bounded agent for reviewable file changes
+        id: propose
+        run: python scripts/md_proposal_worker.py
+      - name: Verify proposed changes before publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          if git diff --quiet -- ui docs; then
+            echo "El agente no produjo cambios concretos"
+            exit 1
+          fi
+          while read -r name; do
+            if [[ "$name" == *.js ]]; then node --check "$name"; fi
+          done < <(git diff --name-only -- ui docs)
+      - name: Publish proposal as PR (never merge automatically)
+        env:
+          CARD_URL: ${{ steps.propose.outputs.card_url }}
+          QUEUE_ID: ${{ steps.propose.outputs.queue_id }}
+          RUN_KEY: ${{ steps.propose.outputs.run_key }}
+          SUMMARY: ${{ steps.propose.outputs.summary }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          BRANCH="md/proposal-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git switch -c "$BRANCH"
+          git config user.name "MD proposal worker"
+          git config user.email "md-proposal-worker@users.noreply.github.com"
+          git add -- ui docs
+          git commit -m "proposal(md): cambio para revisión de tarjeta"
+          git push origin "$BRANCH"
+          BODY=$(printf 'Propuesta, NO implementación verificada.\n\nTarjeta: %s\nqueue_id: %s\nrun_key: %s\nResumen: %s\n\nRequiere pruebas, verificación de despliegue y aprobación CE-1 antes de cualquier cierre.\n' "$CARD_URL" "$QUEUE_ID" "$RUN_KEY" "$SUMMARY")
+          gh pr create --base main --head "$BRANCH" --title "MD: propuesta automática para revisar" --body "$BODY"
