@@ -238,7 +238,14 @@ Deno.serve(async (req) => {
     if (action === "hybrid_selftest") {
       // Server-only validation, returns metrics rather than raw private context.
       if (!(await authorized(req, "sync"))) return json({ error: "sync_capability_required" }, 403);
-      const vector = await embed("verificar tareas y aprendizaje de memoria duilio");
+      let vector;
+      try {
+        vector = await embed("verificar tareas y aprendizaje de memoria duilio");
+      } catch (err) {
+        return json({ action, pass: false, stage: "embed",
+          error_code: String((err as { code?: string })?.code ?? "embedding_failed"),
+          error_message: String((err as { message?: string })?.message ?? err).slice(0, 200) }, 500);
+      }
       const { data, error } = await supabase.rpc("memory_brain_hybrid_v1", {
         p_request: "verificar tareas y aprendizaje de memoria duilio",
         p_project_key: "memoria-duilio",
@@ -248,7 +255,9 @@ Deno.serve(async (req) => {
         p_as_of: null,
         p_specialty: "sql-server",
       });
-      if (error) throw error;
+      if (error) return json({ action, pass: false, stage: "rpc",
+        error_code: error.code ?? "rpc_failed",
+        error_message: String(error.message ?? "").slice(0, 200) }, 500);
       const pass = data?.status === "ok" && data?.retrieval_mode === "text_graph_vector"
         && Array.isArray(data?.semantic_memories)
         && data?.specialists?.dispatch_authorized === false;
