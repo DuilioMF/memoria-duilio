@@ -1,0 +1,93 @@
+{
+  "name": "Memoria Duilio — Sync Notion firmado v2 (inactivo, sin secreto)",
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "nodes": [
+    {
+      "id": "ce610aec-6c36-4451-9a12-8e8147be6601",
+      "name": "Notion Webhook v2 (inactivo)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "memoria-sync-notion-signed-v2",
+        "responseMode": "lastNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "webhookId": "a92d9e85-4c28-4d4b-9b84-e6db96b09b31"
+    },
+    {
+      "id": "0a341919-2aa7-4e48-bfa8-745851bcf5bc",
+      "name": "Separar handshake y exigir firma",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Fail closed: exact raw Notion bytes only. Handshake never enters storage.\nconst output=[];\nfor (const item of $input.all()) {\n  const p=item.json ?? {};\n  const raw = typeof p.body === 'string' ? p.body\n    : typeof p.rawBody === 'string' ? p.rawBody : null;\n  if (!raw || raw.length > 60000) throw new Error('RAW_BODY_REQUIRED');\n  let parsed;\n  try { parsed=JSON.parse(raw); }\n  catch { throw new Error('INVALID_JSON'); }\n  if (parsed && typeof parsed==='object' && typeof parsed.verification_token==='string') {\n    continue; // Notion subscription handshake: never persist or log the token.\n  }\n  const headers=p.headers ?? {};\n  const signature=headers['x-notion-signature'] ?? headers['X-Notion-Signature'];\n  if(typeof signature!=='string' || !/^sha256=[a-fA-F0-9]{64}$/.test(signature)) {\n    throw new Error('NOTION_SIGNATURE_REQUIRED');\n  }\n  output.push({json:{raw_body:raw,signature}});\n}\nreturn output;"
+      }
+    },
+    {
+      "id": "8912fca8-6d82-46ba-86e5-e311d7a2ccab",
+      "name": "Subworkflow verificacion HMAC y Supabase",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "systJoudk1ZUY0hz",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/systJoudk1ZUY0hz",
+          "cachedResultName": "Memoria Duilio — Puente Notion firmado → Supabase (preparado, SIN activar)"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Notion Webhook v2 (inactivo)": {
+      "main": [
+        [
+          {
+            "node": "Separar handshake y exigir firma",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar handshake y exigir firma": {
+      "main": [
+        [
+          {
+            "node": "Subworkflow verificacion HMAC y Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
