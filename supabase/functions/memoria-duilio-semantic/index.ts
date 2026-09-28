@@ -178,31 +178,6 @@ const runSync = async (limit: number) => {
   };
 };
 
-// Service-only, bounded backfill. Never writes fake proof, never embeds on user search.
-const backfillMemoryItems = async (limit: number) => {
-  const batch = Math.min(Math.max(Math.floor(limit || 5), 1), 12);
-  const { data, error } = await supabase.from("memory_items")
-    .select("id,title,summary,content")
-    .eq("owner_key", "duilio").eq("status", "active")
-    .is("embedding", null).order("updated_at", { ascending: false }).limit(batch);
-  if (error) throw error;
-  let embedded = 0;
-  let skipped = 0;
-  for (const item of data ?? []) {
-    const input = [item.title, item.summary, item.content]
-      .filter(Boolean).map((part) => String(part)).join("\n").slice(0, 8000);
-    if (!input.trim()) { skipped++; continue; }
-    const vector = await embed(input);
-    const saved = await supabase.from("memory_items")
-      .update({ embedding: vector, embedding_model: "gte-small",
-                embedding_updated_at: new Date().toISOString() })
-      .eq("id", item.id).is("embedding", null);
-    if (saved.error) throw saved.error;
-    embedded++;
-  }
-  return { embedded, skipped, attempted: (data ?? []).length, batch_limit: batch };
-};
-
 const sanitizeMetadata = (value: unknown) => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const blocked = new Set([
@@ -250,11 +225,14 @@ Deno.serve(async (req) => {
       body.action ?? (body.query ? "search" : "learning_sync"),
     ).toLowerCase();
 
-    if (action === "backfill_items") {
-      // This action is deliberately NOT available to UI/search/capture tokens.
+    if (action === "backfill_chunks" || action === "backfill_items") {
+      // Reuse the existing 384-dimension gte-small chunk pipeline.
+      // Never put a 384-dimension vector into memory_items.embedding (vector(768)).
       if (!(await authorized(req, "sync"))) return json({ error: "sync_capability_required" }, 403);
-      const result = await backfillMemoryItems(Number(body.limit ?? 5));
-      return json({ action, ...result });
+      const batch = Math.min(Math.max(Math.floor(Number(body.limit ?? 5)) || 5, 1), 12);
+      const embedded = await embedChunks(batch);
+      return json({ action: "backfill_chunks", deprecated_alias: action === "backfill_items",
+                    chunks_embedded: embedded, batch_limit: batch });
     }
 
     if (action === "hybrid_context") {
