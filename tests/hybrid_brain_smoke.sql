@@ -7,6 +7,13 @@ BEGIN
   v:=public.memory_brain_hybrid_v1('Revisar medios de pago','memoria-duilio','duilio',NULL,5,now(),'sql-server');
   IF v->>'status'<>'ok' OR v->>'retrieval_mode'<>'text_graph_fallback'
      OR v->>'version'<>'hybrid-v1' THEN RAISE EXCEPTION 'text/graph fallback failed: %',v; END IF;
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v->'text_context') hit
+    JOIN public.memory_items item ON item.id=(hit->>'id')::uuid
+    WHERE item.owner_key IS DISTINCT FROM 'duilio' OR item.project_id IS DISTINCT FROM
+      (SELECT id FROM public.memory_projects
+        WHERE project_key='memoria-duilio' AND owner_key='duilio' LIMIT 1)
+  ) THEN RAISE EXCEPTION 'project-scoped text retrieval leaked another project'; END IF;
   IF v->'specialists'->>'dispatch_authorized'<>'false' THEN
     RAISE EXCEPTION 'router must never self-dispatch'; END IF;
   v_prior:=public.memory_graph_context_at_v1('duilio','memoria-duilio',now(),2);
