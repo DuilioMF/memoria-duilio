@@ -5,6 +5,7 @@ on:
     paths:
       - "ui/**"
       - ".github/workflows/md-ui-check.yml"
+      - "supabase/functions/memoria-home/**"
   workflow_dispatch:
 
 permissions:
@@ -18,6 +19,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Typecheck authenticated Edge Function
+        run: deno check supabase/functions/memoria-home/index.ts
       - name: Verify JavaScript syntax
         run: node --check ui/app.js
       - name: Verify Control tab elements
