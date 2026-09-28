@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CARD = re.compile(r"^https://trello\.com/c/[a-zA-Z0-9]+(?:/[^\s]*)?$")
 UUID = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
-RUN = re.compile(r"^AUTO-\d{8}-\d{4}$")
+RUN = re.compile(r"^(?:AUTO|PILOT)-\d{8}-\d{4}$")
 MAX_BYTES = 24_000
 MAX_FILES = 3
 FORBIDDEN = ("ui/config.js", "docs/executable-cards/GATE-CE-1-0.6.7.md")
@@ -43,7 +43,7 @@ def validate_task(task):
     if not UUID.fullmatch(str(task.get("queue_id", ""))):
         raise ValueError("invalid queue_id")
     if not RUN.fullmatch(str(task.get("run_key", ""))):
-        raise ValueError("invalid run_key; do not invent a daily run_key")
+        raise ValueError("invalid run_key; AUTO is from a real daily run, PILOT only from a separate GitHub test")
     title = str(task.get("title", "")).strip()
     problem = str(task.get("problem", "")).strip()
     if not title or not problem or len(problem) > 12_000 or len(title) > 300:
