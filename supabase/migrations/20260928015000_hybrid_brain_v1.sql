@@ -141,7 +141,8 @@ BEGIN
       INTO v_items FROM (
        SELECT i.id,i.title,i.category,i.claim_state,i.verification_id,
               1-(i.embedding <=> p_query_embedding) AS similarity,
-              'unverified_context_not_instruction'::text AS usage
+              CASE WHEN i.claim_state='verified' AND i.verification_id IS NOT NULL
+                THEN 'verified_context'::text ELSE 'unverified_context_not_instruction'::text END AS usage
          FROM public.memory_items i
         WHERE i.owner_key=p_owner_key AND i.project_id=v_project AND i.status='active'
           AND i.embedding IS NOT NULL AND i.embedding_model='gte-small'
@@ -159,6 +160,13 @@ BEGIN
         FROM public.memory_knowledge k
        WHERE k.owner_key=p_owner_key AND (k.project_id=v_project OR k.project_id IS NULL)
          AND k.status='active' AND k.evidence_count>0 AND k.created_at<=v_at
+         AND EXISTS (
+           SELECT 1 FROM public.memory_knowledge_experiences ke
+           JOIN public.memory_verifications proof ON proof.experience_id=ke.experience_id
+              AND proof.owner_key=p_owner_key AND proof.result='success'
+              AND proof.tested_at<=v_at
+           WHERE ke.knowledge_id=k.id
+         )
          AND (p_query_embedding IS NULL OR (k.embedding IS NOT NULL AND k.embedding_model='gte-small'))
        ORDER BY CASE WHEN p_query_embedding IS NOT NULL THEN k.embedding <=> p_query_embedding ELSE NULL END NULLS LAST,
                 k.score DESC NULLS LAST LIMIT v_count
@@ -198,7 +206,52 @@ BEGIN
       'router_decision_still_authoritative',true));
 END $fn$;
 
+-- Explicit time-versioned relation transition; only trusted service_role can call.
+-- Caller supplies an ALREADY verified memory item. No automatic historical rewrites.
+CREATE OR REPLACE FUNCTION public.memory_transition_relation_v1(
+ p_owner_key text,p_relation_id uuid,p_new_target uuid,
+ p_evidence_item_id uuid,p_at timestamptz DEFAULT now(),
+ p_new_relation_type text DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql SET search_path = '' AS $fn$
+DECLARE
+ v_old public.memory_relations%rowtype;
+ v_new_id uuid;
+ v_at timestamptz:=coalesce(p_at,now());
+ v_type text;
+BEGIN
+  SELECT * INTO v_old FROM public.memory_relations r
+   WHERE r.id=p_relation_id AND r.owner_key=p_owner_key AND r.valid_until IS NULL
+   FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'active relation not found'; END IF;
+  IF v_at>now()+interval '1 minute'
+     OR v_at<=greatest(v_old.created_at,coalesce(v_old.valid_from,v_old.created_at))
+  THEN RAISE EXCEPTION 'invalid transition timestamp'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.memory_entities e
+      WHERE e.id=p_new_target AND e.owner_key=p_owner_key)
+     OR NOT EXISTS (SELECT 1 FROM public.memory_items i
+      WHERE i.id=p_evidence_item_id AND i.owner_key=p_owner_key
+        AND i.claim_state='verified' AND i.verification_id IS NOT NULL)
+  THEN RAISE EXCEPTION 'verified evidence and same-owner target required'; END IF;
+  v_type:=coalesce(nullif(btrim(p_new_relation_type),''),v_old.relation_type);
+  IF p_new_target=v_old.source_entity_id
+    OR (p_new_target=v_old.target_entity_id AND v_type=v_old.relation_type)
+  THEN RAISE EXCEPTION 'invalid or identical replacement'; END IF;
+  UPDATE public.memory_relations SET valid_until=v_at WHERE id=v_old.id;
+  INSERT INTO public.memory_relations
+   (owner_key,source_entity_id,relation_type,target_entity_id,
+    memory_item_id,confidence,valid_from,metadata)
+   VALUES (p_owner_key,v_old.source_entity_id,v_type,p_new_target,
+     p_evidence_item_id,v_old.confidence,v_at,
+     coalesce(v_old.metadata,'{}'::jsonb) ||
+       jsonb_build_object('supersedes_relation_id',v_old.id))
+   RETURNING id INTO v_new_id;
+  RETURN jsonb_build_object('old_id',v_old.id,'new_id',v_new_id,'as_of',v_at,
+    'evidence_item_id',p_evidence_item_id);
+END $fn$;
+
 -- No public client access to backend-only context or specialist proofs.
+REVOKE ALL ON FUNCTION public.memory_transition_relation_v1(text,uuid,uuid,uuid,timestamptz,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.memory_transition_relation_v1(text,uuid,uuid,uuid,timestamptz,text) TO service_role;
 REVOKE ALL ON FUNCTION public.memory_graph_context_at_v1(text,text,timestamptz,integer) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.memory_specialist_candidates_v1(text,text,text,integer) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.memory_brain_hybrid_v1(text,text,text,vector,integer,timestamptz,text) FROM PUBLIC,anon,authenticated;
