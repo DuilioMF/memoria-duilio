@@ -1,0 +1,114 @@
+{
+  "name": "Memoria Duilio — Puente Notion firmado → Supabase (firma verificada; respuesta estructurada)",
+  "nodes": [
+    {
+      "id": "5e05bd9f-1a43-4a30-aad8-b8433e9e95ac",
+      "name": "Llamada desde Sync Notion",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "e49b2641-c783-4b8e-921e-4873848a6f03",
+      "name": "Exigir cuerpo original y firma",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const p = item.json;\n  const raw = p.raw_body ?? p.body;\n  const signature = p.signature ?? p.headers?.['x-notion-signature'];\n  // NEVER re-serialize an already-parsed JSON object: HMAC signs exact bytes.\n  if (typeof raw !== 'string' || !raw.length || raw.length > 60000) {\n    throw new Error('RAW_BODY_REQUIRED: preserve Notion request body exactly');\n  }\n  if (typeof signature !== 'string' || !/^sha256=[0-9a-f]{64}$/i.test(signature)) {\n    throw new Error('NOTION_SIGNATURE_REQUIRED');\n  }\n  return { json: { raw_body: raw, signature } };\n});"
+      }
+    },
+    {
+      "id": "38d41936-3c7d-4fdf-a15a-7e324ca29d4d",
+      "name": "Verificar firma y guardar en Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://pddsehshgfynpmibjqhj.supabase.co/functions/v1/memoria-notion-signed-ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ raw_body:$json.raw_body, signature:$json.signature }) }}",
+        "options": {
+          "timeout": 12000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "58a9b4ae-49b7-47b6-8936-f25de63a63ec",
+      "name": "Normalizar resultado firmado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const x=$input.first()?.json??{};const status=Number(x.statusCode??x.status??0);let b=x.body??{};if(typeof b==='string'){try{b=JSON.parse(b);}catch{b={};}}const ok=status===200&&b?.ok===true&&b?.authenticated===true;return [{json:{ok,authenticated:ok,status_code:status||502,error_code:ok?null:String(b?.error??'EDGE_RESPONSE_UNCONFIRMED')}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Llamada desde Sync Notion": {
+      "main": [
+        [
+          {
+            "node": "Exigir cuerpo original y firma",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exigir cuerpo original y firma": {
+      "main": [
+        [
+          {
+            "node": "Verificar firma y guardar en Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar firma y guardar en Supabase": {
+      "main": [
+        [
+          {
+            "node": "Normalizar resultado firmado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  }
+}
