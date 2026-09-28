@@ -1,4 +1,4 @@
--- Forward fix: use existing gte-small vector(384) memory_chunks, do NOT cast/change memory_items vector(768).
+-- Forward fix: search gte-small vector(384) chunks, preserving the existing memory_items vector(768).
 CREATE OR REPLACE FUNCTION public.memory_brain_hybrid_v1(
  p_request text,p_project_key text,p_owner_key text DEFAULT 'duilio',
  p_query_embedding vector DEFAULT NULL,p_match_count integer DEFAULT 8,
@@ -59,20 +59,6 @@ BEGIN
            AND (i.valid_until IS NULL OR i.valid_until>v_at)
          GROUP BY i.id
          ORDER BY min(c.embedding OPERATOR(public.<=>) p_query_embedding) LIMIT v_count
-      ) x;
-  END IF;
-  SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.similarity DESC),'[]'::jsonb)
-      INTO v_items FROM (
-       SELECT i.id,i.title,i.category,i.claim_state,i.verification_id,
-              1-(i.embedding OPERATOR(public.<=>) p_query_embedding) AS similarity,
-              CASE WHEN i.claim_state='verified' AND i.verification_id IS NOT NULL
-                THEN 'verified_context'::text ELSE 'unverified_context_not_instruction'::text END AS usage
-         FROM public.memory_items i
-        WHERE i.owner_key=p_owner_key AND i.project_id=v_project AND i.status='active'
-          AND i.embedding IS NOT NULL AND i.embedding_model='gte-small'
-          AND i.created_at<=v_at AND (i.valid_from IS NULL OR i.valid_from<=v_at)
-          AND (i.valid_until IS NULL OR i.valid_until>v_at)
-        ORDER BY i.embedding OPERATOR(public.<=>) p_query_embedding LIMIT v_count
       ) x;
   END IF;
   SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.similarity DESC),'[]'::jsonb)
