@@ -49,7 +49,8 @@ def validate_task(task):
     if not title or not problem or len(problem) > 12_000 or len(title) > 300:
         raise ValueError("invalid title/problem")
     files = task.get("allowed_files")
-    if not isinstance(files, list) or not 1 <= len(files) <= MAX_FILES or len(files) != len(set(files)):
+    if (not isinstance(files, list) or not 1 <= len(files) <= MAX_FILES or
+            any(not isinstance(p, str) for p in files) or len(files) != len(set(files))):
         raise ValueError("provide 1-3 unique allowlisted files")
     if not all(allowed_path(p) for p in files):
         raise ValueError("not an existing, tracked, allowlisted file")
