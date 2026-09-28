@@ -118,7 +118,7 @@ CREATE OR REPLACE FUNCTION public.memory_brain_hybrid_v1(
  p_as_of timestamptz DEFAULT now(),p_specialty text DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql STABLE SET search_path = '' AS $fn$
 DECLARE
- v_base jsonb;
+ v_project_name text;
  v_graph jsonb;
  v_items jsonb := '[]'::jsonb;
  v_text jsonb := '[]'::jsonb;
@@ -132,13 +132,17 @@ BEGIN
   IF nullif(btrim(p_request),'') IS NULL OR nullif(btrim(p_project_key),'') IS NULL THEN
     RETURN jsonb_build_object('status','invalid_scope','reason','request_and_project_required');
   END IF;
-  v_base:=public.memory_brain_router(p_request,p_project_key,p_owner_key);
-  IF v_base->'project'->>'project_key' IS DISTINCT FROM p_project_key THEN
+  -- Resolve the exact project with a read-only SELECT. Legacy brain_router may
+  -- mark memories used and therefore cannot be called by a STABLE PostgREST RPC.
+  SELECT p.id,p.project_name INTO v_project,v_project_name
+    FROM public.memory_projects p
+   WHERE p.owner_key=p_owner_key AND p.project_key=p_project_key
+     AND p.status='active' LIMIT 1;
+  IF v_project IS NULL THEN
     RETURN jsonb_build_object('status','unresolved_scope','project_key',p_project_key,
       'verified_knowledge','[]'::jsonb,'verified_experiences','[]'::jsonb,
       'semantic_memories','[]'::jsonb,'specialists',v_specialists);
   END IF;
-  v_project:=(v_base->'project'->>'id')::uuid;
   v_graph:=public.memory_graph_context_at_v1(p_owner_key,p_project_key,v_at,2);
   -- Project-scoped text retrieval: legacy brain_router text hits are unscoped,
   -- so never return them from a project-specific hybrid API.
@@ -217,7 +221,7 @@ BEGIN
     v_specialists:=public.memory_specialist_candidates_v1(p_specialty,p_project_key,p_owner_key,15);
   END IF;
   RETURN jsonb_build_object(
-    'status','ok','version','hybrid-v1','project',v_base->'project',
+    'status','ok','version','hybrid-v1','project',jsonb_build_object('id',v_project,'project_key',p_project_key,'project_name',v_project_name),
     'as_of',v_at,'graph_as_of',v_graph,
     'text_context',v_text,
     'semantic_memories',v_items,'verified_knowledge',v_knowledge,
