@@ -34,11 +34,13 @@ class HybridBrainContracts(unittest.TestCase):
         self.assertIn('if (!isServiceRequest(req)) return json({ error: "service_role_required" }, 403)', self.edge)
 
     def test_backfill_is_bounded_and_opt_in(self):
-        self.assertIn('action === "backfill_items"', self.edge)
+        self.assertIn('action === "backfill_chunks"', self.edge)
         self.assertIn(".is(\"embedding\", null)", self.edge)
-        self.assertIn('const batch = Math.min(Math.max(Math.floor(limit || 5), 1), 12)', self.edge)
+        self.assertIn('const batch = Math.min(Math.max(Math.floor(Number(body.limit ?? 5)) || 5, 1), 12)', self.edge)
         self.assertIn('action === "hybrid_context"', self.edge)
         self.assertIn('p_query_embedding: queryVector', self.edge)
+        self.assertIn("memory_chunks", self.sql)
+        self.assertNotIn("UPDATE public.memory_items SET embedding", self.sql)
 
 if __name__ == "__main__":
     unittest.main()
