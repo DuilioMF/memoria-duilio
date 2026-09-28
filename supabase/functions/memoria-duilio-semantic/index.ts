@@ -178,6 +178,31 @@ const runSync = async (limit: number) => {
   };
 };
 
+// Service-only, bounded backfill. Never writes fake proof, never embeds on user search.
+const backfillMemoryItems = async (limit: number) => {
+  const batch = Math.min(Math.max(Math.floor(limit || 5), 1), 12);
+  const { data, error } = await supabase.from("memory_items")
+    .select("id,title,summary,content")
+    .eq("owner_key", "duilio").eq("status", "active")
+    .is("embedding", null).order("updated_at", { ascending: false }).limit(batch);
+  if (error) throw error;
+  let embedded = 0;
+  let skipped = 0;
+  for (const item of data ?? []) {
+    const input = [item.title, item.summary, item.content]
+      .filter(Boolean).map((part) => String(part)).join("\\n").slice(0, 8000);
+    if (!input.trim()) { skipped++; continue; }
+    const vector = await embed(input);
+    const saved = await supabase.from("memory_items")
+      .update({ embedding: vector, embedding_model: "gte-small",
+                embedding_updated_at: new Date().toISOString() })
+      .eq("id", item.id).is("embedding", null);
+    if (saved.error) throw saved.error;
+    embedded++;
+  }
+  return { embedded, skipped, attempted: (data ?? []).length, batch_limit: batch };
+};
+
 const sanitizeMetadata = (value: unknown) => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const blocked = new Set([
@@ -224,6 +249,47 @@ Deno.serve(async (req) => {
     const action = String(
       body.action ?? (body.query ? "search" : "learning_sync"),
     ).toLowerCase();
+
+    if (action === "backfill_items") {
+      // This action is deliberately NOT available to UI/search/capture tokens.
+      if (!isServiceRequest(req)) return json({ error: "service_role_required" }, 403);
+      const result = await backfillMemoryItems(Number(body.limit ?? 5));
+      return json({ action, ...result });
+    }
+
+    if (action === "hybrid_context") {
+      // Private orchestration endpoint; do not leak raw project graphs to the public UI.
+      if (!isServiceRequest(req)) return json({ error: "service_role_required" }, 403);
+      const query = String(body.query ?? "").trim();
+      const projectKey = String(body.project_key ?? "").trim();
+      const specialty = body.specialty == null ? null : String(body.specialty).trim().toLowerCase();
+      if (!query || query.length > 4000 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(projectKey)) {
+        return json({ error: "valid query and project_key required" }, 400);
+      }
+      if (specialty && !/^[a-z0-9][a-z0-9_-]{0,79}$/.test(specialty)) {
+        return json({ error: "invalid specialty" }, 400);
+      }
+      let asOf: string | null = null;
+      if (body.as_of != null) {
+        const dt = new Date(String(body.as_of));
+        if (!Number.isFinite(dt.getTime()) || dt.getTime() > Date.now()) {
+          return json({ error: "invalid as_of" }, 400);
+        }
+        asOf = dt.toISOString();
+      }
+      const queryVector = await embed(query);
+      const { data, error } = await supabase.rpc("memory_brain_hybrid_v1", {
+        p_request: query,
+        p_project_key: projectKey,
+        p_owner_key: "duilio",
+        p_query_embedding: queryVector,
+        p_match_count: Math.min(Math.max(Math.floor(Number(body.limit ?? 8)) || 8, 1), 12),
+        p_as_of: asOf,
+        p_specialty: specialty,
+      });
+      if (error) throw error;
+      return json({ action, ...data });
+    }
 
     if (action === "health") {
       return json({ status: "ok", version: 11, phase: 6 });
