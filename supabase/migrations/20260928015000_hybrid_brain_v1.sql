@@ -74,6 +74,9 @@ CREATE TABLE IF NOT EXISTS public.memory_executor_specialty_evidence (
   UNIQUE (executor_key,specialty,verification_id)
 );
 ALTER TABLE public.memory_executor_specialty_evidence ENABLE ROW LEVEL SECURITY;
+CREATE POLICY memory_executor_specialty_backend_only
+ ON public.memory_executor_specialty_evidence FOR ALL TO service_role
+ USING (true) WITH CHECK (true);
 REVOKE ALL ON public.memory_executor_specialty_evidence FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.memory_executor_specialty_evidence TO service_role;
 
