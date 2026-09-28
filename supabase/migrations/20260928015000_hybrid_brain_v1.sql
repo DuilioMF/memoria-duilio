@@ -155,7 +155,26 @@ BEGIN
        ORDER BY relevance DESC NULLS LAST,i.updated_at DESC LIMIT v_count
     ) t;
   IF p_query_embedding IS NOT NULL THEN
+    -- memory_items.embedding is vector(768), reserved for another model.
+    -- The existing gte-small (384) embeddings live in memory_chunks; never mix dimensions.
     SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.similarity DESC),'[]'::jsonb)
+      INTO v_items FROM (
+        SELECT i.id,i.title,i.category,i.claim_state,i.verification_id,
+               1-min(c.embedding OPERATOR(public.<=>) p_query_embedding) AS similarity,
+               CASE WHEN i.claim_state='verified' AND i.verification_id IS NOT NULL
+                    THEN 'verified_context'::text
+                    ELSE 'unverified_context_not_instruction'::text END AS usage
+          FROM public.memory_chunks c
+          JOIN public.memory_items i ON i.id=c.memory_item_id
+         WHERE i.owner_key=p_owner_key AND i.project_id=v_project AND i.status='active'
+           AND c.embedding IS NOT NULL AND c.embedding_model='gte-small'
+           AND i.created_at<=v_at AND (i.valid_from IS NULL OR i.valid_from<=v_at)
+           AND (i.valid_until IS NULL OR i.valid_until>v_at)
+         GROUP BY i.id
+         ORDER BY min(c.embedding OPERATOR(public.<=>) p_query_embedding) LIMIT v_count
+      ) x;
+  END IF;
+  SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.similarity DESC),'[]'::jsonb)
       INTO v_items FROM (
        SELECT i.id,i.title,i.category,i.claim_state,i.verification_id,
               1-(i.embedding OPERATOR(public.<=>) p_query_embedding) AS similarity,
