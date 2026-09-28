@@ -235,6 +235,30 @@ Deno.serve(async (req) => {
                     chunks_embedded: embedded, batch_limit: batch });
     }
 
+    if (action === "hybrid_selftest") {
+      // Server-only validation, returns metrics rather than raw private context.
+      if (!(await authorized(req, "sync"))) return json({ error: "sync_capability_required" }, 403);
+      const vector = await embed("verificar tareas y aprendizaje de memoria duilio");
+      const { data, error } = await supabase.rpc("memory_brain_hybrid_v1", {
+        p_request: "verificar tareas y aprendizaje de memoria duilio",
+        p_project_key: "memoria-duilio",
+        p_owner_key: "duilio",
+        p_query_embedding: vector,
+        p_match_count: 3,
+        p_as_of: null,
+        p_specialty: "sql-server",
+      });
+      if (error) throw error;
+      const pass = data?.status === "ok" && data?.retrieval_mode === "text_graph_vector"
+        && Array.isArray(data?.semantic_memories)
+        && data?.specialists?.dispatch_authorized === false;
+      return json({ action, pass, retrieval_mode: data?.retrieval_mode,
+        semantic_hits: data?.semantic_memories?.length ?? 0,
+        verified_knowledge: data?.verified_knowledge?.length ?? 0,
+        graph_nodes: data?.graph_as_of?.nodes?.length ?? 0,
+        specialist_status: data?.specialists?.status ?? null }, pass ? 200 : 500);
+    }
+
     if (action === "hybrid_context") {
       // Private orchestration endpoint; do not leak raw project graphs to the public UI.
       if (!isServiceRequest(req)) return json({ error: "service_role_required" }, 403);
