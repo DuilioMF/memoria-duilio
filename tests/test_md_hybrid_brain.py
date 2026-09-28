@@ -15,7 +15,7 @@ class HybridBrainContracts(unittest.TestCase):
         cls.edge = EDGE.read_text(encoding="utf-8")
 
     def test_preserves_legacy_apis(self):
-        self.assertNotIn("DROP FUNCTION public.memory_brain_router", self.sql.upper())
+        self.assertNotIn("DROP FUNCTION PUBLIC.MEMORY_BRAIN_ROUTER", self.sql.upper())
         self.assertNotIn("DROP TABLE", self.sql.upper())
         self.assertIn("memory_brain_hybrid_v1", self.sql)
         self.assertIn("memory_graph_context_at_v1", self.sql)
