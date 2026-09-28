@@ -1,0 +1,280 @@
+{
+  "name": "Memoria Duilio — Sync Notion firmado v2 (raw binario y rechazo seguro v2)",
+  "nodes": [
+    {
+      "id": "ce610aec-6c36-4451-9a12-8e8147be6601",
+      "name": "Notion Webhook v2 (inactivo)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "memoria-sync-notion-signed-v2",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "webhookId": "a92d9e85-4c28-4d4b-9b84-e6db96b09b31"
+    },
+    {
+      "id": "0a341919-2aa7-4e48-bfa8-745851bcf5bc",
+      "name": "Separar handshake y exigir firma",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Capture Notion's exact signed bytes even in n8n filesystem binary-data mode.\n// No token is stored, logged or forwarded by this production workflow.\nconst result=[];\nconst input=$input.all();\nfor(let i=0;i<input.length;i++){\n  const p=input[i].json??{};\n  if(!input[i].binary?.data)throw new Error('RAW_BINARY_REQUIRED');\n  const bytes=await this.helpers.getBinaryDataBuffer(i,'data');\n  if(!bytes?.length||bytes.length>60000)throw new Error('RAW_BODY_SIZE_INVALID');\n  const raw=bytes.toString('utf8');\n  if(Buffer.byteLength(raw,'utf8')!==bytes.length)throw new Error('INVALID_UTF8');\n  let parsed;\n  try{parsed=JSON.parse(raw);}catch{throw new Error('INVALID_JSON');}\n  if(parsed&&typeof parsed==='object'&&typeof parsed.verification_token==='string'){\n    // We ACK the subscription handshake, but do NOT expose or persist its private token.\n    result.push({json:{is_handshake:true,handshake_received:true}});\n    continue;\n  }\n  const headers=p.headers??{};\n  const signature=headers['x-notion-signature']??headers['X-Notion-Signature'];\n  if(typeof signature!=='string'||!/^sha256=[a-f0-9]{64}$/i.test(signature))throw new Error('NOTION_SIGNATURE_REQUIRED');\n  result.push({json:{is_handshake:false,raw_body:raw,signature}});\n}\nreturn result;"
+      }
+    },
+    {
+      "id": "52be8f28-0ee5-443f-8963-c7e9d727934c",
+      "name": "Si es handshake",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "1e731011-83ed-4b2a-b86c-6840063de19c",
+              "leftValue": "={{ $json.is_handshake }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7e381e64-063c-41f4-a3c9-f23d7aa72d9b",
+      "name": "ACK handshake sin guardar secreto",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        -180
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ok:true,handshake_received:true}) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "8912fca8-6d82-46ba-86e5-e311d7a2ccab",
+      "name": "Subworkflow verificacion HMAC y Supabase",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        120
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "systJoudk1ZUY0hz",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/systJoudk1ZUY0hz",
+          "cachedResultName": "Memoria Duilio — Puente Notion firmado → Supabase (preparado, SIN activar)"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "ad36c6dc-aeeb-4119-8bdb-cfc3de6db3be",
+      "name": "Exigir validación HMAC real",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        120
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const v=$input.first()?.json??{};const ok=v.ok===true&&v.authenticated===true&&Number(v.status_code)===200;return [{json:{verified:ok,status_code:ok?200:(Number(v.status_code)===503?503:401),error_code:ok?null:String(v.error_code??'UNAUTHORIZED_SIGNATURE')}}];"
+      }
+    },
+    {
+      "id": "a02d1a30-7321-4926-a141-6ac68b65e251",
+      "name": "ACK evento verificado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        10
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ok:true,verified:true}) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "8d04126e-e430-474c-89fd-3ea7aa378d83",
+      "name": "Si HMAC y guardado OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "de915852-1b5c-450f-9c75-a4d99e4caf89",
+              "leftValue": "={{ $json.verified }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "367796bf-6106-41be-8baa-24b7636822d0",
+      "name": "Rechazar firma o configuración",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        270
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ok:false,error:$json.status_code===503?'NOT_CONFIGURED':'UNAUTHORIZED_SIGNATURE'}) }}",
+        "options": {
+          "responseCode": "={{ $json.status_code }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Notion Webhook v2 (inactivo)": {
+      "main": [
+        [
+          {
+            "node": "Separar handshake y exigir firma",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar handshake y exigir firma": {
+      "main": [
+        [
+          {
+            "node": "Si es handshake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si es handshake": {
+      "main": [
+        [
+          {
+            "node": "ACK handshake sin guardar secreto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Subworkflow verificacion HMAC y Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subworkflow verificacion HMAC y Supabase": {
+      "main": [
+        [
+          {
+            "node": "Exigir validación HMAC real",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exigir validación HMAC real": {
+      "main": [
+        [
+          {
+            "node": "Si HMAC y guardado OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si HMAC y guardado OK": {
+      "main": [
+        [
+          {
+            "node": "ACK evento verificado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rechazar firma o configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}
