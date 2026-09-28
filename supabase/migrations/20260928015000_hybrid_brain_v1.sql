@@ -175,20 +175,6 @@ BEGIN
       ) x;
   END IF;
   SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.similarity DESC),'[]'::jsonb)
-      INTO v_items FROM (
-       SELECT i.id,i.title,i.category,i.claim_state,i.verification_id,
-              1-(i.embedding OPERATOR(public.<=>) p_query_embedding) AS similarity,
-              CASE WHEN i.claim_state='verified' AND i.verification_id IS NOT NULL
-                THEN 'verified_context'::text ELSE 'unverified_context_not_instruction'::text END AS usage
-         FROM public.memory_items i
-        WHERE i.owner_key=p_owner_key AND i.project_id=v_project AND i.status='active'
-          AND i.embedding IS NOT NULL AND i.embedding_model='gte-small'
-          AND i.created_at<=v_at AND (i.valid_from IS NULL OR i.valid_from<=v_at)
-          AND (i.valid_until IS NULL OR i.valid_until>v_at)
-        ORDER BY i.embedding OPERATOR(public.<=>) p_query_embedding LIMIT v_count
-      ) x;
-  END IF;
-  SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.similarity DESC),'[]'::jsonb)
     INTO v_knowledge FROM (
       SELECT k.id,k.title,k.statement,k.evidence_count,k.status,
         CASE WHEN p_query_embedding IS NOT NULL AND k.embedding IS NOT NULL
