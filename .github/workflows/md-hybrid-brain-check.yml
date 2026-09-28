@@ -1,0 +1,21 @@
+name: MD hybrid brain contract checks
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*hybrid_brain*'
+      - 'supabase/functions/memoria-duilio-semantic/**'
+      - 'tests/test_md_hybrid_brain.py'
+      - 'tests/hybrid_brain_smoke.sql'
+      - '.github/workflows/md-hybrid-brain-check.yml'
+  workflow_dispatch:
+jobs:
+  static-contracts:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -p test_md_hybrid_brain.py -v
