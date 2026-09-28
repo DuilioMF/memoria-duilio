@@ -190,7 +190,7 @@ const backfillMemoryItems = async (limit: number) => {
   let skipped = 0;
   for (const item of data ?? []) {
     const input = [item.title, item.summary, item.content]
-      .filter(Boolean).map((part) => String(part)).join("\\n").slice(0, 8000);
+      .filter(Boolean).map((part) => String(part)).join("\n").slice(0, 8000);
     if (!input.trim()) { skipped++; continue; }
     const vector = await embed(input);
     const saved = await supabase.from("memory_items")
