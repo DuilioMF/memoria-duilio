@@ -1,0 +1,25 @@
+name: MD - Notion signed ingress checks
+
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/memoria-notion-signed-ingest/**"
+      - ".github/workflows/md-notion-ingest-check.yml"
+      - "docs/integrations/notion-signed-ingest-20260927.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Typecheck signed ingress
+        run: deno check supabase/functions/memoria-notion-signed-ingest/index.ts
+      - name: Test exact-body HMAC and event validation
+        run: deno test supabase/functions/memoria-notion-signed-ingest/verify_test.ts
