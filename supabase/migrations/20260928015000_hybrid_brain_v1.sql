@@ -121,6 +121,7 @@ DECLARE
  v_base jsonb;
  v_graph jsonb;
  v_items jsonb := '[]'::jsonb;
+ v_text jsonb := '[]'::jsonb;
  v_knowledge jsonb := '[]'::jsonb;
  v_experiences jsonb := '[]'::jsonb;
  v_specialists jsonb := jsonb_build_object('status','not_requested','eligible','[]'::jsonb,'dispatch_authorized',false);
@@ -139,6 +140,20 @@ BEGIN
   END IF;
   v_project:=(v_base->'project'->>'id')::uuid;
   v_graph:=public.memory_graph_context_at_v1(p_owner_key,p_project_key,v_at,2);
+  -- Project-scoped text retrieval: legacy brain_router text hits are unscoped,
+  -- so never return them from a project-specific hybrid API.
+  SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY t.relevance DESC NULLS LAST),'[]'::jsonb)
+    INTO v_text FROM (
+      SELECT i.id,i.title,i.summary,i.category,i.claim_state,
+             ts_rank(i.search_vector,websearch_to_tsquery('simple',p_request)) AS relevance
+        FROM public.memory_items i
+       WHERE i.owner_key=p_owner_key AND i.project_id=v_project AND i.status='active'
+         AND i.created_at<=v_at AND (i.valid_from IS NULL OR i.valid_from<=v_at)
+         AND (i.valid_until IS NULL OR i.valid_until>v_at)
+         AND (i.search_vector @@ websearch_to_tsquery('simple',p_request)
+              OR lower(i.title) LIKE '%'||lower(split_part(btrim(p_request),' ',1))||'%')
+       ORDER BY relevance DESC NULLS LAST,i.updated_at DESC LIMIT v_count
+    ) t;
   IF p_query_embedding IS NOT NULL THEN
     SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.similarity DESC),'[]'::jsonb)
       INTO v_items FROM (
@@ -199,7 +214,7 @@ BEGIN
   RETURN jsonb_build_object(
     'status','ok','version','hybrid-v1','project',v_base->'project',
     'as_of',v_at,'graph_as_of',v_graph,
-    'text_context',coalesce(v_base->'retrieved_memory','[]'::jsonb),
+    'text_context',v_text,
     'semantic_memories',v_items,'verified_knowledge',v_knowledge,
     'verified_experiences',v_experiences,'specialists',v_specialists,
     'retrieval_mode',CASE WHEN p_query_embedding IS NULL THEN 'text_graph_fallback' ELSE 'text_graph_vector' END,
