@@ -143,7 +143,7 @@ BEGIN
     SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.similarity DESC),'[]'::jsonb)
       INTO v_items FROM (
        SELECT i.id,i.title,i.category,i.claim_state,i.verification_id,
-              1-(i.embedding <=> p_query_embedding) AS similarity,
+              1-(i.embedding OPERATOR(public.<=>) p_query_embedding) AS similarity,
               CASE WHEN i.claim_state='verified' AND i.verification_id IS NOT NULL
                 THEN 'verified_context'::text ELSE 'unverified_context_not_instruction'::text END AS usage
          FROM public.memory_items i
@@ -151,14 +151,14 @@ BEGIN
           AND i.embedding IS NOT NULL AND i.embedding_model='gte-small'
           AND i.created_at<=v_at AND (i.valid_from IS NULL OR i.valid_from<=v_at)
           AND (i.valid_until IS NULL OR i.valid_until>v_at)
-        ORDER BY i.embedding <=> p_query_embedding LIMIT v_count
+        ORDER BY i.embedding OPERATOR(public.<=>) p_query_embedding LIMIT v_count
       ) x;
   END IF;
   SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.similarity DESC),'[]'::jsonb)
     INTO v_knowledge FROM (
       SELECT k.id,k.title,k.statement,k.evidence_count,k.status,
         CASE WHEN p_query_embedding IS NOT NULL AND k.embedding IS NOT NULL
-             AND k.embedding_model='gte-small' THEN 1-(k.embedding <=> p_query_embedding)
+             AND k.embedding_model='gte-small' THEN 1-(k.embedding OPERATOR(public.<=>) p_query_embedding)
              ELSE NULL END AS similarity
         FROM public.memory_knowledge k
        WHERE k.owner_key=p_owner_key AND (k.project_id=v_project OR k.project_id IS NULL)
@@ -171,7 +171,7 @@ BEGIN
            WHERE ke.knowledge_id=k.id
          )
          AND (p_query_embedding IS NULL OR (k.embedding IS NOT NULL AND k.embedding_model='gte-small'))
-       ORDER BY CASE WHEN p_query_embedding IS NOT NULL THEN k.embedding <=> p_query_embedding ELSE NULL END NULLS LAST,
+       ORDER BY CASE WHEN p_query_embedding IS NOT NULL THEN k.embedding OPERATOR(public.<=>) p_query_embedding ELSE NULL END NULLS LAST,
                 k.score DESC NULLS LAST LIMIT v_count
     ) x;
   SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.similarity DESC NULLS LAST,x.tested_at DESC),'[]'::jsonb)
@@ -179,7 +179,7 @@ BEGIN
       SELECT e.id,e.problem_type,e.solution,e.outcome,e.model_name,
              latest.id AS verification_id,latest.tested_at,
              CASE WHEN p_query_embedding IS NOT NULL AND e.embedding IS NOT NULL
-                  AND e.embedding_model='gte-small' THEN 1-(e.embedding <=> p_query_embedding)
+                  AND e.embedding_model='gte-small' THEN 1-(e.embedding OPERATOR(public.<=>) p_query_embedding)
                   ELSE NULL END AS similarity
         FROM public.memory_experiences e
         JOIN LATERAL (
@@ -190,7 +190,7 @@ BEGIN
        WHERE e.owner_key=p_owner_key AND e.project_id=v_project
          AND e.occurred_at<=v_at
          AND (p_query_embedding IS NULL OR (e.embedding IS NOT NULL AND e.embedding_model='gte-small'))
-       ORDER BY CASE WHEN p_query_embedding IS NOT NULL THEN e.embedding <=> p_query_embedding ELSE NULL END NULLS LAST,
+       ORDER BY CASE WHEN p_query_embedding IS NOT NULL THEN e.embedding OPERATOR(public.<=>) p_query_embedding ELSE NULL END NULLS LAST,
                 latest.tested_at DESC LIMIT v_count
     ) x;
   IF nullif(btrim(p_specialty),'') IS NOT NULL THEN
