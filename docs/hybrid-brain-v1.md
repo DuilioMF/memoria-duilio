@@ -13,7 +13,7 @@
   `memory_verifications` reales. `memory_specialist_candidates_v1` descarta ejecutores
   no automáticos, sin prueba, desconectados o sin heartbeat reciente. **Nunca despacha**:
   el selector autoritativo sigue siendo `memory_select_executor_v2`.
-- La Edge Function semántica añade `hybrid_context` y `backfill_items` **solo para service_role**.
+- La Edge Function semántica añade `hybrid_context` **solo para service_role**, y `backfill_items` para service_role o la capacidad protegida `sync` del backend.
   El backfill se invoca explícitamente, acotado a 1–12 recuerdos por llamada, no durante
   una búsqueda. Reutiliza el modelo `gte-small` y no crea experiencias ni verificaciones.
 
@@ -32,7 +32,7 @@ Opcional `as_of` ISO 8601. Sin proyecto válido: no retorna conocimiento de otro
 NUNCA poner service_role en navegador ni en la tarjeta de Trello. Un proxy autenticado
 y autorizado puede exponerse a la UI en otro cambio, con respuesta minimizada.
 
-Backfill controlado: `{"action":"backfill_items","limit":5}` en el mismo endpoint;
+Backfill controlado: `{"action":"backfill_items","limit":5}` en el mismo endpoint; mantener `x-memory-sync-token` exclusivamente en el backend.
 comprobar métricas antes/después y no procesar toda la base en un único disparo.
 Las memorias sin vector siguen recuperándose mediante la ruta textual existente.
 
@@ -77,3 +77,9 @@ Las memorias sin vector siguen recuperándose mediante la ruta textual existente
   El forward fix `20260928021000_hybrid_brain_operator_fix_v1.sql`
   repara la resolución del operador `OPERATOR(public.<=>)` cuando la función usa
   `search_path=''`.
+
+## Registro de despliegue inicial
+- SQL instalado: `hybrid_brain_v1`, `hybrid_brain_operator_fix_v1` y `hybrid_brain_project_scope_fix_v1`.
+- La corrección de proyecto impide que el nuevo endpoint entregue resultados de búsqueda textual de otros proyectos.
+- Edge `memoria-duilio-semantic` v22 se publicó inicialmente; la nueva variante con `sync` para lotes requiere publicación y reprueba.
+- Los endpoints nuevos no sustituyen el router autoritativo ni activan el proceso de las 08:00.
