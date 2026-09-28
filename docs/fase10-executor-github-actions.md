@@ -40,3 +40,28 @@ Los IDs del ejemplo son ilustrativos; el dispatcher debe obtener los reales y no
 `python -m unittest discover -s tests -p test_md_proposal_worker.py -v` verifica rutas, ID, límites y salidas peligrosas sin gastar API. CI ejecuta estas pruebas en pull requests. El primer `repository_dispatch` real exige credenciales configuradas y un caso piloto que genere cambios y un PR. Registrar su URL y SHA; no presentar las pruebas unitarias como prueba end-to-end.
 
 El ciclo solicitado a las 08:00 sigue pendiente de integrar y verificar; este adaptador aporta únicamente la fase «ejecutar/proponer cambio real en rama revisable» de forma segura.
+
+## Piloto autónomo acotado — registro de evidencia
+
+Esta sección documenta la evidencia verificable para la primera prueba autónoma mediante GitHub Actions en este repositorio.
+
+**Importante:** Este piloto es únicamente GitHub-only y NO demuestra el circuito natural a las 08:00: Trello → n8n → cola de MD real. Tampoco usa una cola MD real ni autoriza el cierre automático de tarjetas en Trello, merge o deploy.
+
+---
+
+### Plantilla de auditoría de evidencia
+
+- **Issue URL:** (URL a la tarjeta/issue original en Trello o sistema equivalente)
+- **Piloto UUID correlation-only:** (UUID único asociado a este piloto para correlación, sin impacto operativo)
+- **run_key PILOT:** PIlot run_key asociado (ejemplo: "PILOT-20260928-1820")
+- **GitHub Actions run URL:** (Enlace directo a la ejecución de GitHub Actions que ejecutó el piloto)
+- **Hash commit:** (SHA commit generado por la propuesta en rama para revisión)
+- **Pull Request generado:** (URL del PR creado para revisión manual)
+- **Pruebas realizadas:** (Listado breve de pruebas ejecutadas, p.ej., `git diff --check`, `node --check`)
+- **Resultado humano:** (Descripción del análisis humano tras revisar PR y evidencia; no se afirma éxito antes de esta evaluación)
+- **Criterio CE-1 aplicado:** (Confirmación de cumplimiento o bloqueo respecto a política CE-1)
+- **Rollback:** (Estrategia o acción tomada para revertir cambios si la propuesta no es aceptada o detecta fallas)
+
+---
+
+Esta plantilla debe completarse con enlaces y hashes reales tras la ejecución y revisión práctica de la prueba piloto.
