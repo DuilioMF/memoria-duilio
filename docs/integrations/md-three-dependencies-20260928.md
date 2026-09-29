@@ -4,7 +4,7 @@ Documento de implementación y entrega parcial. NO acreditar las tres rutas como
 
 ## 1. Notion firmado
 
-- Preexistente: Edge Function `memoria-notion-signed-ingest` v1 ACTIVE, con verificación HMAC sobre cuerpo original; deniega peticiones si falta el token.
+- Preexistente: Edge Function `memoria-notion-signed-ingest` v3 ACTIVE (verificado en Supabase 28/09); todavía sin evento natural con firma registrada, con verificación HMAC sobre cuerpo original; deniega peticiones si falta el token.
 - Activado con éxito: n8n `systJoudk1ZUY0hz` (subworkflow, sin webhook público) y `l7nvEEDtF2a16a6G` (workflow v2 con Raw Body y exclusión del handshake). Ambos se leyeron de vuelta con `active=true` el 28/09.
 - Nuevo endpoint, distinto del heredado: `https://n8n.srv1251563.hstgr.cloud/webhook/memoria-sync-notion-signed-v2`.
 - La antigua ruta v1 y su respaldo permanecen intactos. Los nuevos workflows fueron publicados para recibir el handshake, NO para omitir la autenticación.
@@ -17,17 +17,17 @@ Documento de implementación y entrega parcial. NO acreditar las tres rutas como
 - Creado en n8n: `mOoGmiZmjOLOoJsc`, "Fase 10 — Despacho a GitHub Actions", INACTIVO hasta credenciales y piloto. Su fuente exportable está en `n8n/memoria-fase10-github-dispatch-v1.json` de esta rama.
 - Recibe solo un claim `memory_queue_claim_v2` autenticado de `github-actions-md`, con `execution_run_id`, `queue_id`, `card_url`, `run_key` y tarea acotada. Despacha `repository_dispatch` al repo canónico y exige HTTP 204. **Un 204 es recepción, no ejecución satisfactoria**.
 - Registrado en Supabase `memory_executor_registry` el ejecutor `github-actions-md` como `pending_connection`, `enabled=false`, `automatic=false`; ninguna tarjeta puede atribuirle ejecución ficticia.
-- Faltan acciones privadas: asignar en el nodo n8n "GitHub repository_dispatch" una credencial Header Auth con GitHub PAT de mínimos permisos; configurar `OPENAI_API_KEY` en GitHub Actions repository secrets y validar permisos para crear PR.
+- Verificado: `OPENAI_API_KEY` de GitHub Actions funcionó en el piloto [run 36485443278](https://github.com/DuilioMF/memoria-duilio/actions/runs/36485443278), que generó commit `861da01`; posteriormente se abrió [PR #12](https://github.com/DuilioMF/memoria-duilio/pull/12) mediante una conexión separada. **La creación automática del PR falló** por permisos de GitHub Actions. Acciones privadas restantes: credencial GitHub PAT de mínimo alcance para el nodo n8n y habilitar/validar el permiso de Actions para crear PR; no volver a solicitar una clave OpenAI que ya demostró funcionar en ese piloto.
 - Falta integrar el claim específico/heartbeat en el proceso n8n y obtener prueba de punta a punta desde una tarjeta REAL con un solo `queue_id`: claim, dispatch, Actions run, commit/PR, CI, reversión y registro en Supabase/Trello. **No** habilitar el ejecutor ni mover tarjeta a cerrado antes de esos hechos y el gate CE-1.
 
 ## 3. Centro de control autenticado
 
-- El proyecto Supabase MD tenía `auth.users=0` al comprobarse el 28/09.
-- Se desplegó `memoria-home-auth-v1` v1 ACTIVE con `verify_jwt=true`. Fuente exacta: `supabase/functions/memoria-home/index.ts` de `main`, blob `dff6dbe7e806e3422c751a2c6dbbc84e8d27ba9d`.
+- **Relectura posterior el 28/09:** el proyecto Supabase MD ya tiene `auth.users=1` (SELECT de conteo solamente). No se validó que sea el usuario dueño ni se comprobó la configuración de `MD_OWNER_USER_ID` o `MD_ALLOWED_ORIGINS`: contar un usuario no acredita acceso autenticado.
+- Se desplegó `memoria-home-auth-v1` v3 ACTIVE (inventario Supabase 28/09) con `verify_jwt=true`. Fuente exacta: `supabase/functions/memoria-home/index.ts` de `main`, blob `dff6dbe7e806e3422c751a2c6dbbc84e8d27ba9d`.
 - Este despliegue es paralelo, no reemplaza la Edge legacy `memoria-home` ni actualiza el front-end publicado. Niega el acceso sin `MD_OWNER_USER_ID` o sesión válida.
-- Pendiente: crear y verificar un usuario propio en **este proyecto Supabase MD**, configurar solo en Secrets `MD_OWNER_USER_ID` con su UID real y `MD_ALLOWED_ORIGINS` con el origen exacto del frontend autorizado.
+- Pendiente: **identificar y verificar privadamente el usuario existente** en este proyecto Supabase MD (no crear duplicados), configurar en Secrets `MD_OWNER_USER_ID` con su UID real y `MD_ALLOWED_ORIGINS` con el origen exacto del frontend autorizado. No divulgar UID, contraseña ni tokens en Trello/GitHub/chat.
 - Prueba de aceptación: 401 sin token y con otra identidad; 403 desde origen no autorizado; sesión válida del dueño; pestaña Control con totales reales de `memory_control_center_summary()`; publicación visual autenticada y rollback documentado.
-- Atención: `ui/config.js` de main apunta a la Edge legacy y no contiene una clave pública real configurada; el frontend no se considera listo para publicar solo por haber desplegado la nueva Edge.
+- Atención: `ui/config.js` de la **rama de este PR** prepara el endpoint `memoria-home-auth-v1` y una clave pública `anon` de Supabase; no demuestra publicación, identidad del dueño validada ni funcionamiento end-to-end. No reemplazar el frontend publicado sin esa verificación.
 
 ## Reglas de continuidad
 
