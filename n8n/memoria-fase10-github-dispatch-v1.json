@@ -1,0 +1,128 @@
+{
+  "name": "Memoria Duilio — Fase 10 — Despacho a GitHub Actions (PENDIENTE CREDENCIALES)",
+  "description": "STAGED. Corrected queue_run_v2 metadata.task contract, with explicit worker_id correlation. GitHub credential + verified schedule/claim and heartbeat are required before enabling; never close Trello on dispatch 204.",
+  "nodes": [
+    {
+      "id": "424a6d19-d6f6-4eb7-af9f-63e9f11dd570",
+      "name": "Recepción interna de claim v2",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "77f3ff91-1cba-475b-bf03-78566e82e1b1",
+      "name": "Validar claim y tarea acotada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const claim=$input.first().json;\nconst job=claim.job??{};\n// The real queue claim returns job.metadata, not a top-level task.\nconst req=claim.task??job.metadata?.dispatch_task??job.metadata?.task??{};\nconst worker=String(claim.worker_id??'').trim();\nconst UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst CARD=/^https:\\/\\/trello\\.com\\/c\\/[a-z0-9]+(?:\\/[^\\s]*)?$/i;\nconst RUN=/^AUTO-\\d{8}-\\d{4}$/;\nconst ok=claim.ok===true && claim.claimed===true && claim.protocol===\"queue_run_v2\";\nconst files=req.allowed_files??[];\nconst fileOK=p=>typeof p==='string'&&!p.includes('..')&&!p.includes(String.fromCharCode(92))\n  &&(/^(ui|docs)\\/[a-zA-Z0-9_.\\/-]+$/.test(p))\n  &&p!==\"ui/config.js\"&&!p.startsWith(\"docs/executable-cards/\");\nif(!ok||!UUID.test(String(job.id||\"\"))||!UUID.test(String(claim.execution_run_id||\"\")))\n throw new Error(\"VERIFIED_QUEUE_V2_CLAIM_REQUIRED\");\nif(job.executor_key!==\"github-actions-md\")throw new Error(\"WRONG_EXECUTOR\");\nif(!/^[a-zA-Z0-9_:-]{6,100}$/.test(worker))throw new Error(\"WORKER_ID_REQUIRED\");\nif(!CARD.test(job.card_url??\"\")||!RUN.test(req.run_key??\"\"))\n throw new Error(\"REAL_CARD_AND_DAILY_RUN_REQUIRED\");\nif((claim.run_key&&claim.run_key!==req.run_key)||req.queue_id!==job.id||req.card_url!==job.card_url||req.project_key!==\"memoria-duilio\")\n throw new Error(\"CLAIM_PAYLOAD_MISMATCH\");\nif(typeof req.title!==\"string\"||!req.title.trim()||req.title.length>300||\n typeof req.problem!==\"string\"||!req.problem.trim()||req.problem.length>12000||\n !Array.isArray(files)||files.length<1||files.length>3||\n new Set(files).size!==files.length||!files.every(fileOK))\n throw new Error(\"BOUNDED_TASK_REQUIRED\");\nconst criteria=req.acceptance_criteria??[];\nif(!Array.isArray(criteria)||criteria.length>8||!criteria.every(s=>typeof s==='string'&&s.length<=400))\n throw new Error(\"INVALID_ACCEPTANCE_CRITERIA\");\nreturn [{json:{\n  event_type:\"md_propose\",\n  client_payload:{card_url:job.card_url,queue_id:job.id,run_key:req.run_key,\n    title:req.title.trim(),problem:req.problem,allowed_files:files,acceptance_criteria:criteria,\n    execution_run_id:claim.execution_run_id,worker_id:worker},\n  execution_run_id:claim.execution_run_id,\n  status:\"validated_pending_dispatch\"\n}}];"
+      }
+    },
+    {
+      "id": "10bba80f-4cb4-4028-9250-cd3d6ee82d4d",
+      "name": "GitHub repository_dispatch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.github.com/repos/DuilioMF/memoria-duilio/dispatches",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({event_type:$json.event_type,client_payload:$json.client_payload}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "1a93280c-03a3-4408-899a-c5c4a1020abf",
+      "name": "Confirmar 204 sin cerrar tarea",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const response=$input.first().json??{};\nconst code=Number(response.statusCode??response.status??0);\nif(code!==204){\n  throw new Error(\"GITHUB_DISPATCH_UNCONFIRMED_\"+(code||\"NO_STATUS\"));\n}\nconst c=$(\"Validar claim y tarea acotada\").first().json;\nreturn [{json:{\n  status:\"dispatched_waiting_for_pr\",dispatched:true,queue_id:c.client_payload.queue_id,\n  card_url:c.client_payload.card_url,run_key:c.client_payload.run_key,\n  execution_run_id:c.execution_run_id,\n  note:\"GitHub accepted event only. DO NOT mark queue completed or close Trello. Verify actual Actions run, PR, tests and CE-1.\"\n}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Recepción interna de claim v2": {
+      "main": [
+        [
+          {
+            "node": "Validar claim y tarea acotada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar claim y tarea acotada": {
+      "main": [
+        [
+          {
+            "node": "GitHub repository_dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub repository_dispatch": {
+      "main": [
+        [
+          {
+            "node": "Confirmar 204 sin cerrar tarea",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  }
+}
