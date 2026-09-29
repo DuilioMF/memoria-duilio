@@ -57,6 +57,11 @@ class ThreeIntegrationsContract(unittest.TestCase):
                        "WRONG_EXECUTOR", "CLAIM_PAYLOAD_MISMATCH",
                        "REAL_CARD_AND_DAILY_RUN_REQUIRED"):
             self.assertIn(marker, guard)
+        # Real memory_queue_claim_v2 returns job.metadata, not top-level task.
+        self.assertIn("job.metadata?.task", guard)
+        self.assertIn("WORKER_ID_REQUIRED", guard)
+        self.assertIn("execution_run_id:claim.execution_run_id", guard)
+        self.assertIn("claim.run_key&&claim.run_key!==req.run_key", guard)
         dispatch = node(w, "GitHub repository_dispatch")
         self.assertEqual(dispatch["parameters"]["method"], "POST")
         self.assertEqual(dispatch["parameters"]["authentication"], "genericCredentialType")
