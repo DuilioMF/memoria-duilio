@@ -21,6 +21,14 @@ class WorkerValidation(unittest.TestCase):
     def test_valid_bounded_task(self):
         self.assertEqual(w.validate_task(copy.deepcopy(BASE)), ["ui/app.js"])
 
+    def test_valid_pilot_not_mislabeled_daily_run(self):
+        payload = copy.deepcopy(BASE)
+        payload["run_key"] = "PILOT-20260928-1800"
+        self.assertEqual(w.validate_task(payload), ["ui/app.js"])
+        payload["run_key"] = "PILOT-20260928-NOT-DAILY"
+        with self.assertRaises(ValueError):
+            w.validate_task(payload)
+
     def test_reject_untrusted_paths(self):
         for path in ["../.env", ".github/workflows/pwn.yml", "ui/config.js",
                      "ui/../../secret", "/tmp/evil.py"]:
