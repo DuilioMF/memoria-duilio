@@ -8,6 +8,7 @@ on:
       - 'n8n/memoria-fase10-github-dispatch-v1.json'
       - 'ui/config.js'
       - 'tests/test_md_three_integrations.py'
+      - 'tests/test_md_f13_live.py'
       - '.github/workflows/md-three-integrations-check.yml'
   workflow_dispatch:
 
@@ -27,3 +28,25 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_md_three_integrations.py' -v
           git diff --check
+
+  f13-live-negative:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Live 401/403/CORS smoke (public anon key only; no owner session)
+        run: python tests/test_md_f13_live.py backend
+
+  f13-published-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Confirm canonical public page and deployed auth config
+        run: python tests/test_md_f13_live.py frontend
