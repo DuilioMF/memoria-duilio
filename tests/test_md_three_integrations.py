@@ -74,6 +74,34 @@ class ThreeIntegrationsContract(unittest.TestCase):
         # An unconnected draft must not be represented as an active dispatcher.
         self.assertFalse(w.get("active", False))
 
+
+    def test_dispatch_guard_executes_real_metadata_and_rejects_bad_claims(self):
+        import subprocess
+        guard = node(workflow("memoria-fase10-github-dispatch-v1.json"),
+                     "Validar claim y tarea acotada")["parameters"]["jsCode"]
+        script = "const execute = new Function('$input', " + json.dumps(guard) + ");\n" + r"""
+const assert = require('node:assert/strict');
+const id = '11111111-1111-4111-8111-111111111111';
+const task = {queue_id:id,card_url:'https://trello.com/c/E7ZOVRGE',
+ project_key:'memoria-duilio',run_key:'AUTO-20260929-0757',
+ title:'Pilot',problem:'Document bounded pilot',allowed_files:['docs/pilot.md']};
+const claim = {ok:true,claimed:true,protocol:'queue_run_v2',
+ worker_id:'github-actions-md',execution_run_id:id,
+ job:{id,executor_key:'github-actions-md',card_url:task.card_url,
+ metadata:{dispatch_task:task}}};
+const run=c=>execute({first:()=>({json:c})});
+assert.equal(run(claim)[0].json.client_payload.worker_id,claim.worker_id);
+assert.equal(run(claim)[0].json.client_payload.execution_run_id,id);
+for (const c of [{...claim,claimed:false},{...claim,worker_id:''},
+ {...claim,job:{...claim.job,executor_key:'other'}},
+ {...claim,job:{...claim.job,metadata:{dispatch_task:{...task,allowed_files:['ui/config.js']}}}},
+ {...claim,job:{...claim.job,metadata:{dispatch_task:{...task,allowed_files:['docs/../secret']}}}},
+ {...claim,job:{...claim.job,metadata:{dispatch_task:{...task,queue_id:'22222222-2222-4222-8222-222222222222'}}}}])
+ assert.throws(()=>run(c));
+"""
+        result = subprocess.run(["node", "-e", script], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_github_job_preparation_is_fail_closed(self):
         sql = (ROOT / "supabase" / "migrations" /
                "20260929220500_md_prepare_github_proposal.sql").read_text(encoding="utf-8")
