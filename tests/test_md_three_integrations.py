@@ -74,6 +74,17 @@ class ThreeIntegrationsContract(unittest.TestCase):
         # An unconnected draft must not be represented as an active dispatcher.
         self.assertFalse(w.get("active", False))
 
+    def test_github_job_preparation_is_fail_closed(self):
+        sql = (ROOT / "supabase" / "migrations" /
+               "20260929220500_md_prepare_github_proposal.sql").read_text(encoding="utf-8")
+        for required in ("security invoker", "revoke all on function",
+                         "to service_role", "active heartbeat",
+                         "memory_scheduled_runs", "recent eligible Trello",
+                         "metadata->'dispatch_task'", "dispatch_ready',false",
+                         "only an unclaimed GitHub"):
+            self.assertIn(required, sql)
+        self.assertNotIn("repository_dispatch", sql)
+
     def test_control_staging_requires_owner_session(self):
         config = (ROOT / "ui" / "config.js").read_text(encoding="utf-8")
         self.assertIn("/functions/v1/memoria-home-auth-v1", config)
