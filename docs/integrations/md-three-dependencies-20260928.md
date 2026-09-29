@@ -35,3 +35,26 @@ Documento de implementación y entrega parcial. NO acreditar las tres rutas como
 ## Reglas de continuidad
 
 No imprimir credenciales, no inventar identidades ni usar una firma HMAC falsa. Conservar fuentes previas, versiones y backups; actualizar tarjetas con pruebas, estado, ejecutor y siguiente paso. MD-0800 deberá pasar una corrida NATURAL limpia antes de su cierre; ningún cambio anterior equivale a esa prueba.
+
+
+## CONTROL VERIFICADO 29/09/2026 19:05 ART — avance de esta sesión
+
+**Fase 10 — versión y n8n corregidos; E2E NO logrado.**
+- El despachador n8n de este PR suponía incorrectamente un objeto `claim.task` obligatorio; `memory_queue_claim_v2` devuelve `job.metadata`. Su validación ahora admite `claim.task ?? job.metadata.dispatch_task ?? job.metadata.task`, exige `worker_id` y vincula `execution_run_id` con el payload de GitHub. Se aplicó la corrección al workflow **real pero inactivo** `mOoGmiZmjOLOoJsc`, tras comprobar que coincidía con la versión previa exportada; GET posterior la confirmó. **Sin credencial GitHub; no activar todavía.**
+- La creación vigente de la cola tampoco rellena `metadata.dispatch_task`. Se versionó la RPC **staging, no aplicada en Supabase productivo**, `supabase/migrations/20260929220500_md_prepare_github_proposal.sql` para preparar una tarea acotada sobre un trabajo existente del ejecutor `github-actions-md`. Requiere corrida natural 08:00 con heartbeat reciente, tarjeta apta Por hacer y rutas limitadas. No encola, no reclama, no despacha y no marca health como ready. El proceso de las 08:00 aún debe invocarla con parámetros reales y el runner debe enviar heartbeat/resultado y correlación hasta PR+tests+CE-1.
+- GitHub Actions tiene `OPENAI_API_KEY` verificada en preflight; falta un token dedicado de alcance mínimo: crear privadamente `MD_GITHUB_PR_TOKEN` (para rama/PR) y una credencial GitHub Header Auth en n8n. No imprimir, copiar a tarjeta ni guardar credenciales en este PR. La alternativa de habilitar que GITHUB_TOKEN cree y apruebe PR amplía permisos y necesita autorización específica.
+- La regresión offline para contratos y backend negativo F13 pasó en la rama de revisión. **El job de frontend publicado sigue fallando**: el runner recibe 403 de `.chatgpt.site`. Por ello PR sigue draft y CI global NO está verde.
+
+**Fase 9 — primera mitad E2E confirmada.**
+- Tarjeta real, nacida de conversación del dueño: https://trello.com/c/V7ChrgSM (marcador MD-F9-20260929-SESSION-1).
+- Trello -> n8n -> Supabase `memory_ingest_events`: `createCard` y `addLabelToCard` procesados con IDs de memorias independientes; evidencia en la tarjeta. Falta cola real -> ejecutor -> PR -> prueba -> vista autenticada.
+
+**Notion — no reemplazar a ciegas.**
+- La suscripción Notion sigue conectada a `memoria-sync-notion-v1`; n8n v2 `l7nvEEDtF2a16a6G` y su puente están activos, con Edge v2 fail-closed. Los 5 eventos históricos `source_type=notion` procesados en Supabase **carecen** de `signature_verified=true` y de `webhook_version=2`; no existe evidencia de un evento firmado v2 real.
+- La UI del proveedor no permite modificar URL de la única suscripción: asegurar primero un mecanismo de **captura privada y no persistente** del `verification_token` del handshake, luego sustituir v1 por la URL v2 y registrar ese token privadamente en Supabase Edge Secrets como `NOTION_WEBHOOK_VERIFICATION_TOKEN`. Probar firma natural, rechazo inválido y deduplicación. No eliminar v1 si no se puede capturar el token nuevo y documentar la eventual ventana de interrupción.
+
+**Fase 13 — backend real, visualización del dueño pendiente.**
+- `memoria-home-auth-v1` v6 deployed con dueño/origen configurados. Pruebas negativas 401 (JWT público no dueño), 403 (origen no autorizado), 204 (preflight correcto) pasan, y `memory_control_center_summary()` devuelve datos reales. Esto NO acredita sesión real con el dueño ni vista publicada.
+- `main/ui/config.js` aún apunta a Edge heredada `memoria-home`, mientras la rama draft apunta a `memoria-home-auth-v1`. Confirmar el despliegue de la fuente *real* al Site canónico y, desde la sesión autorizada del dueño, login/POST control_center 200/vista Control. Un 403 al runner no demuestra que el dueño no pueda entrar.
+
+**Corrida diaria y cierres:** `AUTO-20260929-0757` terminó `incomplete` a las 08:45 por `stale_heartbeat` (último 08:04), aunque produjo el commit de GitHub de PR #12. No hubo `queue_id` auténtico ni PR automático desde esa corrida. No falsificar heartbeat, no habilitar el ejecutor ni cerrar tarjetas hasta la prueba real y la próxima corrida natural 08:00 limpia. JBD no iniciado.
