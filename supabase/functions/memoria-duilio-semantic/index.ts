@@ -225,6 +225,83 @@ Deno.serve(async (req) => {
       body.action ?? (body.query ? "search" : "learning_sync"),
     ).toLowerCase();
 
+    if (action === "backfill_chunks" || action === "backfill_items") {
+      // Reuse the existing 384-dimension gte-small chunk pipeline.
+      // Never put a 384-dimension vector into memory_items.embedding (vector(768)).
+      if (!(await authorized(req, "sync"))) return json({ error: "sync_capability_required" }, 403);
+      const batch = Math.min(Math.max(Math.floor(Number(body.limit ?? 5)) || 5, 1), 12);
+      const embedded = await embedChunks(batch);
+      return json({ action: "backfill_chunks", deprecated_alias: action === "backfill_items",
+                    chunks_embedded: embedded, batch_limit: batch });
+    }
+
+    if (action === "hybrid_selftest") {
+      // Server-only validation, returns metrics rather than raw private context.
+      if (!(await authorized(req, "sync"))) return json({ error: "sync_capability_required" }, 403);
+      let vector;
+      try {
+        vector = await embed("verificar tareas y aprendizaje de memoria duilio");
+      } catch (err) {
+        return json({ action, pass: false, stage: "embed",
+          error_code: String((err as { code?: string })?.code ?? "embedding_failed"),
+          error_message: String((err as { message?: string })?.message ?? err).slice(0, 200) }, 500);
+      }
+      const { data, error } = await supabase.rpc("memory_brain_hybrid_v1", {
+        p_request: "verificar tareas y aprendizaje de memoria duilio",
+        p_project_key: "memoria-duilio",
+        p_owner_key: "duilio",
+        p_query_embedding: vector,
+        p_match_count: 3,
+        p_as_of: null,
+        p_specialty: "sql-server",
+      });
+      if (error) return json({ action, pass: false, stage: "rpc",
+        error_code: error.code ?? "rpc_failed",
+        error_message: String(error.message ?? "").slice(0, 200) }, 500);
+      const pass = data?.status === "ok" && data?.retrieval_mode === "text_graph_vector"
+        && Array.isArray(data?.semantic_memories)
+        && data?.specialists?.dispatch_authorized === false;
+      return json({ action, pass, retrieval_mode: data?.retrieval_mode,
+        semantic_hits: data?.semantic_memories?.length ?? 0,
+        verified_knowledge: data?.verified_knowledge?.length ?? 0,
+        graph_nodes: data?.graph_as_of?.nodes?.length ?? 0,
+        specialist_status: data?.specialists?.status ?? null }, pass ? 200 : 500);
+    }
+
+    if (action === "hybrid_context") {
+      // Private orchestration endpoint; do not leak raw project graphs to the public UI.
+      if (!isServiceRequest(req)) return json({ error: "service_role_required" }, 403);
+      const query = String(body.query ?? "").trim();
+      const projectKey = String(body.project_key ?? "").trim();
+      const specialty = body.specialty == null ? null : String(body.specialty).trim().toLowerCase();
+      if (!query || query.length > 4000 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(projectKey)) {
+        return json({ error: "valid query and project_key required" }, 400);
+      }
+      if (specialty && !/^[a-z0-9][a-z0-9_-]{0,79}$/.test(specialty)) {
+        return json({ error: "invalid specialty" }, 400);
+      }
+      let asOf: string | null = null;
+      if (body.as_of != null) {
+        const dt = new Date(String(body.as_of));
+        if (!Number.isFinite(dt.getTime()) || dt.getTime() > Date.now()) {
+          return json({ error: "invalid as_of" }, 400);
+        }
+        asOf = dt.toISOString();
+      }
+      const queryVector = await embed(query);
+      const { data, error } = await supabase.rpc("memory_brain_hybrid_v1", {
+        p_request: query,
+        p_project_key: projectKey,
+        p_owner_key: "duilio",
+        p_query_embedding: queryVector,
+        p_match_count: Math.min(Math.max(Math.floor(Number(body.limit ?? 8)) || 8, 1), 12),
+        p_as_of: asOf,
+        p_specialty: specialty,
+      });
+      if (error) throw error;
+      return json({ action, ...data });
+    }
+
     if (action === "health") {
       return json({ status: "ok", version: 11, phase: 6 });
     }
