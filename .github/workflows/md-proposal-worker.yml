@@ -46,12 +46,22 @@ jobs:
       MD_TASK_JSON: ${{ github.event_name == 'repository_dispatch' && toJSON(github.event.client_payload) || inputs.task_json }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: gpt-4.1-mini
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.MD_GITHUB_PR_TOKEN || secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Report PR credential mode
+        env:
+          HAS_DEDICATED_PR_TOKEN: ${{ secrets.MD_GITHUB_PR_TOKEN != '' }}
+        shell: bash
+        run: |
+          if [[ "$HAS_DEDICATED_PR_TOKEN" == "true" ]]; then
+            echo "Using dedicated least-privilege token for branch push and PR creation"
+          else
+            echo "::warning::Using GITHUB_TOKEN fallback; repository policy must allow Actions to create pull requests"
+          fi
       - name: Reject duplicate PR for same queue
         shell: bash
         run: |
