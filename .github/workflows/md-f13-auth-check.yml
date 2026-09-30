@@ -1,0 +1,24 @@
+name: MD Fase 13 auth checks
+on:
+  pull_request:
+    paths:
+      - "ui/config.js"
+      - "tests/test_md_f13_auth.py"
+      - ".github/workflows/md-f13-auth-check.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "ui/config.js"
+      - "tests/test_md_f13_auth.py"
+      - ".github/workflows/md-f13-auth-check.yml"
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python tests/test_md_f13_auth.py
